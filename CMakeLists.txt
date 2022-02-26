@@ -377,6 +377,27 @@ if(ENABLE_PROFILER)
   target_link_libraries(gazebo_ros_ackermann_drive ${ignition-common3_LIBRARIES})
 endif()
 
+# ht_nav_gazebo_ros_ackermann_drive
+add_library(ht_nav_gazebo_ros_ackermann_drive SHARED
+  src/ht_nav_gazebo_ros_ackermann_drive.cpp
+)
+target_include_directories(ht_nav_gazebo_ros_ackermann_drive PUBLIC include)
+ament_target_dependencies(ht_nav_gazebo_ros_ackermann_drive
+  "gazebo_dev"
+  "gazebo_ros"
+  "geometry_msgs"
+  "nav_msgs"
+  "rclcpp"
+  "tf2"
+  "tf2_geometry_msgs"
+  "tf2_ros"
+)
+ament_export_libraries(ht_nav_gazebo_ros_ackermann_drive)
+if(ENABLE_PROFILER)
+  target_include_directories(ht_nav_gazebo_ros_ackermann_drive PUBLIC ${ignition-common3_INCLUDE_DIRS})
+  target_link_libraries(ht_nav_gazebo_ros_ackermann_drive ${ignition-common3_LIBRARIES})
+endif()
+
 # gazebo_ros_elevator
 add_library(gazebo_ros_elevator SHARED
   src/gazebo_ros_elevator.cpp
@@ -515,6 +536,7 @@ install(DIRECTORY include/
 
 install(TARGETS
     gazebo_ros_ackermann_drive
+    ht_nav_gazebo_ros_ackermann_drive
     gazebo_ros_bumper
     gazebo_ros_camera
     gazebo_ros_diff_drive
