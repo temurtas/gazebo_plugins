@@ -19,7 +19,7 @@
 #include <gazebo/physics/Model.hh>
 #include <gazebo/physics/World.hh>
 #include <gazebo/physics/physics.hh>
-#include <gazebo_plugins/ht_nav_gazebo_ros_ackermann_drive.hpp>
+#include <gazebo_plugins/gazebo_ros_new_ackermann_drive.hpp>
 #include <gazebo_ros/conversions/builtin_interfaces.hpp>
 #include <gazebo_ros/conversions/geometry_msgs.hpp>
 #include <gazebo_ros/node.hpp>
@@ -41,7 +41,7 @@
 
 namespace gazebo_plugins
 {
-class HTNavGazeboRosAckermannDrivePrivate
+class GazeboRosNewAckermannDrivePrivate
 {
 public:
   /// Indicates which joint
@@ -80,7 +80,7 @@ public:
   // For AckermanSteer
   std::vector<double> GetAckAngles(double phi);
   std::vector<double> GetDiffSpeeds(double vel, double phi);
-
+  
   /// Extracts radius of a cylinder or sphere collision shape
   /// \param[in] _coll Pointer to collision
   /// \return If the collision shape is valid, return radius
@@ -120,17 +120,16 @@ public:
   /// Pointers to wheel joints.
   std::vector<gazebo::physics::JointPtr> joints_;
 
+  /// Pointer to model.
+  gazebo::physics::ModelPtr model_;
+
   //  Pointer to linear velocity variables
   std::vector<double> linear_vel_;
   std::vector<double> target_linear_vel_;
   std::vector<double> linear_diff_;
   std::vector<double> linear_cmd_;
 
-
-  /// Pointer to model.
-  gazebo::physics::ModelPtr model_;
-
-  // 
+    // 
   int counter_ = 0; 
   double past_target_rot_ = 0.0;
 
@@ -207,16 +206,16 @@ public:
   gazebo::common::PID pid_linear_vel_;
 };
 
-HTNavGazeboRosAckermannDrive::HTNavGazeboRosAckermannDrive()
-: impl_(std::make_unique<HTNavGazeboRosAckermannDrivePrivate>())
+GazeboRosNewAckermannDrive::GazeboRosNewAckermannDrive()
+: impl_(std::make_unique<GazeboRosNewAckermannDrivePrivate>())
 {
 }
 
-HTNavGazeboRosAckermannDrive::~HTNavGazeboRosAckermannDrive()
+GazeboRosNewAckermannDrive::~GazeboRosNewAckermannDrive()
 {
 }
 
-void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf)
+void GazeboRosNewAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf)
 {
   impl_->model_ = _model;
 
@@ -234,9 +233,9 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
 
   auto steering_wheel_joint =
     _sdf->Get<std::string>("steering_wheel_joint", "steering_wheel_joint").first;
-  impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::STEER_WHEEL] =
+  impl_->joints_[GazeboRosNewAckermannDrivePrivate::STEER_WHEEL] =
     _model->GetJoint(steering_wheel_joint);
-  if (!impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::STEER_WHEEL]) {
+  if (!impl_->joints_[GazeboRosNewAckermannDrivePrivate::STEER_WHEEL]) {
     RCLCPP_WARN(
       impl_->ros_node_->get_logger(),
       "Steering wheel joint [%s] not found.", steering_wheel_joint.c_str());
@@ -244,8 +243,8 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
   }
 
   auto front_right_joint = _sdf->Get<std::string>("front_right_joint", "front_right_joint").first;
-  impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::FRONT_RIGHT] = _model->GetJoint(front_right_joint);
-  if (!impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::FRONT_RIGHT]) {
+  impl_->joints_[GazeboRosNewAckermannDrivePrivate::FRONT_RIGHT] = _model->GetJoint(front_right_joint);
+  if (!impl_->joints_[GazeboRosNewAckermannDrivePrivate::FRONT_RIGHT]) {
     RCLCPP_ERROR(
       impl_->ros_node_->get_logger(),
       "Front right wheel joint [%s] not found, plugin will not work.", front_right_joint.c_str());
@@ -254,8 +253,8 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
   }
 
   auto front_left_joint = _sdf->Get<std::string>("front_left_joint", "front_left_joint").first;
-  impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::FRONT_LEFT] = _model->GetJoint(front_left_joint);
-  if (!impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::FRONT_LEFT]) {
+  impl_->joints_[GazeboRosNewAckermannDrivePrivate::FRONT_LEFT] = _model->GetJoint(front_left_joint);
+  if (!impl_->joints_[GazeboRosNewAckermannDrivePrivate::FRONT_LEFT]) {
     RCLCPP_ERROR(
       impl_->ros_node_->get_logger(),
       "Front left wheel joint [%s] not found, plugin will not work.", front_left_joint.c_str());
@@ -264,8 +263,8 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
   }
 
   auto rear_right_joint = _sdf->Get<std::string>("rear_right_joint", "rear_right_joint").first;
-  impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::REAR_RIGHT] = _model->GetJoint(rear_right_joint);
-  if (!impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::REAR_RIGHT]) {
+  impl_->joints_[GazeboRosNewAckermannDrivePrivate::REAR_RIGHT] = _model->GetJoint(rear_right_joint);
+  if (!impl_->joints_[GazeboRosNewAckermannDrivePrivate::REAR_RIGHT]) {
     RCLCPP_ERROR(
       impl_->ros_node_->get_logger(),
       "Rear right wheel joint [%s] not found, plugin will not work.", rear_right_joint.c_str());
@@ -274,8 +273,8 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
   }
 
   auto rear_left_joint = _sdf->Get<std::string>("rear_left_joint", "rear_left_joint").first;
-  impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::REAR_LEFT] = _model->GetJoint(rear_left_joint);
-  if (!impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::REAR_LEFT]) {
+  impl_->joints_[GazeboRosNewAckermannDrivePrivate::REAR_LEFT] = _model->GetJoint(rear_left_joint);
+  if (!impl_->joints_[GazeboRosNewAckermannDrivePrivate::REAR_LEFT]) {
     RCLCPP_ERROR(
       impl_->ros_node_->get_logger(),
       "Rear left wheel joint [%s] not found, plugin will not work.", rear_left_joint.c_str());
@@ -285,9 +284,9 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
 
   auto right_steering_joint =
     _sdf->Get<std::string>("right_steering_joint", "right_steering_joint").first;
-  impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::STEER_RIGHT] =
+  impl_->joints_[GazeboRosNewAckermannDrivePrivate::STEER_RIGHT] =
     _model->GetJoint(right_steering_joint);
-  if (!impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::STEER_RIGHT]) {
+  if (!impl_->joints_[GazeboRosNewAckermannDrivePrivate::STEER_RIGHT]) {
     RCLCPP_ERROR(
       impl_->ros_node_->get_logger(),
       "Right wheel steering joint [%s] not found, plugin will not work.",
@@ -298,9 +297,9 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
 
   auto left_steering_joint =
     _sdf->Get<std::string>("left_steering_joint", "left_steering_joint").first;
-  impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::STEER_LEFT] =
+  impl_->joints_[GazeboRosNewAckermannDrivePrivate::STEER_LEFT] =
     _model->GetJoint(left_steering_joint);
-  if (!impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::STEER_LEFT]) {
+  if (!impl_->joints_[GazeboRosNewAckermannDrivePrivate::STEER_LEFT]) {
     RCLCPP_ERROR(
       impl_->ros_node_->get_logger(),
       "Left wheel steering joint [%s] not found, plugin will not work.",
@@ -342,18 +341,18 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
   // assumes all wheel of both rear wheels of same radii
   unsigned int id = 0;
   impl_->wheel_radius_ = impl_->CollisionRadius(
-    impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::REAR_RIGHT]->GetChild()->GetCollision(id));
+    impl_->joints_[GazeboRosNewAckermannDrivePrivate::REAR_RIGHT]->GetChild()->GetCollision(id));
 
   // Compute wheel_base, front wheel separation, and rear wheel separation
   // first compute the positions of the 4 wheel centers
   // again assumes wheel link is child of joint and has only one collision
-  auto front_right_center_pos = impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::FRONT_RIGHT]->
+  auto front_right_center_pos = impl_->joints_[GazeboRosNewAckermannDrivePrivate::FRONT_RIGHT]->
     GetChild()->GetCollision(id)->WorldPose().Pos();
-  auto front_left_center_pos = impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::FRONT_LEFT]->
+  auto front_left_center_pos = impl_->joints_[GazeboRosNewAckermannDrivePrivate::FRONT_LEFT]->
     GetChild()->GetCollision(id)->WorldPose().Pos();
-  auto rear_right_center_pos = impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::REAR_RIGHT]->
+  auto rear_right_center_pos = impl_->joints_[GazeboRosNewAckermannDrivePrivate::REAR_RIGHT]->
     GetChild()->GetCollision(id)->WorldPose().Pos();
-  auto rear_left_center_pos = impl_->joints_[HTNavGazeboRosAckermannDrivePrivate::REAR_LEFT]->
+  auto rear_left_center_pos = impl_->joints_[GazeboRosNewAckermannDrivePrivate::REAR_LEFT]->
     GetChild()->GetCollision(id)->WorldPose().Pos();
 
   auto distance = front_left_center_pos - front_right_center_pos;
@@ -377,7 +376,7 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
 
   impl_->cmd_vel_sub_ = impl_->ros_node_->create_subscription<geometry_msgs::msg::Twist>(
     "cmd_vel", qos.get_subscription_qos("cmd_vel", rclcpp::QoS(1)),
-    std::bind(&HTNavGazeboRosAckermannDrivePrivate::OnCmdVel, impl_.get(), std::placeholders::_1));
+    std::bind(&GazeboRosNewAckermannDrivePrivate::OnCmdVel, impl_.get(), std::placeholders::_1));
 
   RCLCPP_INFO(
     impl_->ros_node_->get_logger(), "Subscribed to [%s]", impl_->cmd_vel_sub_->get_topic_name());
@@ -443,10 +442,10 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
 
   // Listen to the update event (broadcast every simulation iteration)
   impl_->update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
-    std::bind(&HTNavGazeboRosAckermannDrivePrivate::OnUpdate, impl_.get(), std::placeholders::_1));
+    std::bind(&GazeboRosNewAckermannDrivePrivate::OnUpdate, impl_.get(), std::placeholders::_1));
 }
 
-void HTNavGazeboRosAckermannDrive::Reset()
+void GazeboRosNewAckermannDrive::Reset()
 {
   impl_->last_update_time_ = impl_->model_->GetWorld()->SimTime();
 
@@ -455,10 +454,10 @@ void HTNavGazeboRosAckermannDrive::Reset()
   impl_->distance_.data = 0;
 }
 
-void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo & _info)
+void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo & _info)
 {
   #ifdef IGN_PROFILER_ENABLE
-  IGN_PROFILE("HTNavGazeboRosAckermannDrivePrivate::OnUpdate");
+  IGN_PROFILE("GazeboRosNewAckermannDrivePrivate::OnUpdate");
   #endif
   std::lock_guard<std::mutex> lock(lock_);
 
@@ -519,7 +518,11 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_BEGIN("update");
 #endif
-
+  // Current speed assuming equal for left rear and right rear
+  auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
+  auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
+  double linear_diff = linear_vel - target_linear / wheel_radius_;
+  double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
   /* Compute Linear Velocity Command */
   linear_vel_.assign(6, 0.0);
   target_linear_vel_.assign(6, 0.0);
@@ -529,7 +532,7 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
   linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
 
-  std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
+std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
 
   // if (counter_%100 == 0){
   // RCLCPP_INFO(
@@ -549,84 +552,124 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   if (counter_%100 == 0){
   RCLCPP_INFO(
         ros_node_->get_logger(),
-        "Lin vel vs Target Vel [%lf] , [%lf]", linear_vel_[REAR_LEFT] * wheel_radius_ , target_linear_vel_[REAR_LEFT] );
+        "Lin vel Old vs New [%lf] , [%lf]", linear_vel_[REAR_LEFT] * wheel_radius_ , linear_vel * wheel_radius_);
   }    
 
   if (counter_%100 == 0){
   RCLCPP_INFO(
         ros_node_->get_logger(),
-        "Lin Diff vs Lin CMD [%lf] , [%lf]", linear_diff_[REAR_LEFT]  , linear_cmd_[REAR_LEFT] );
+        "Target vel Old vs New [%lf] , [%lf]", target_linear_vel_[REAR_LEFT] , target_linear );
+  }    
+
+  if (counter_%100 == 0){
+  RCLCPP_INFO(
+        ros_node_->get_logger(),
+        "Lin Diff New vs Old [%lf] , [%lf]", linear_diff_[REAR_LEFT]  , linear_diff );
   }   
 
+  if (counter_%100 == 0){
+  RCLCPP_INFO(
+        ros_node_->get_logger(),
+        "Lin CMD New vs Old [%lf] , [%lf]", linear_cmd_[REAR_LEFT]  , linear_cmd );
+  }   
+
+  auto target_rot = target_rot_ * copysign(1.0, target_linear_);
+  target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
+
+  double tanSteer = tan(target_rot);
+
+  auto target_left_steering =
+    atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+  auto target_right_steering =
+    atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+
+  auto left_steering_angle = joints_[STEER_LEFT]->Position(0);
+  auto right_steering_angle = joints_[STEER_RIGHT]->Position(0);
+
+  double left_steering_diff = left_steering_angle - target_left_steering;
+  double left_steering_cmd =
+    pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
+
+  double right_steering_diff = right_steering_angle - target_right_steering;
+  double right_steering_cmd =
+    pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
+
+  auto steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
+
   /* Compute Steering Angle Commands */
-  // std::vector<double> target_rot;
-  // target_rot.assign(6, 0.0);
+  std::vector<double> target_rot_6;
+  target_rot_6.assign(6, 0.0);
 
-  // std::vector<double> steer_ang_curr;
-  // steer_ang_curr.assign(6, 0.0);
+  std::vector<double> steer_ang_curr;
+  steer_ang_curr.assign(6, 0.0);
 
-  // std::vector<double> steer_error;
-  // steer_error.assign(6, 0.0);
+  std::vector<double> steer_error;
+  steer_error.assign(6, 0.0);
 
-  // std::vector<double> steer_cmd_effort;
-  // steer_cmd_effort.assign(6, 0.0);
+  std::vector<double> steer_cmd_effort;
+  steer_cmd_effort.assign(6, 0.0);
 
-  // std::vector<double> ack_steer_angles = GetAckAngles(target_rot_); 
+  std::vector<double> ack_steer_angles = GetAckAngles(target_rot_); 
 
-  // target_rot[STEER_LEFT] = ignition::math::clamp(ack_steer_angles[STEER_LEFT], -max_steer_, max_steer_);
-  // target_rot[STEER_RIGHT] = ignition::math::clamp(ack_steer_angles[STEER_RIGHT], -max_steer_, max_steer_);
+  target_rot_6[STEER_LEFT] = ignition::math::clamp(ack_steer_angles[STEER_LEFT], -max_steer_, max_steer_);
+  target_rot_6[STEER_RIGHT] = ignition::math::clamp(ack_steer_angles[STEER_RIGHT], -max_steer_, max_steer_);
 
-  // steer_ang_curr[STEER_LEFT] = joints_[STEER_LEFT]->Position(0);
-  // steer_error[STEER_LEFT] = steer_ang_curr[STEER_LEFT] - target_rot[STEER_LEFT];
-  // steer_cmd_effort[STEER_LEFT] = pid_left_steering_.Update(steer_error[STEER_LEFT], seconds_since_last_update);
+  steer_ang_curr[STEER_LEFT] = joints_[STEER_LEFT]->Position(0);
+  steer_error[STEER_LEFT] = steer_ang_curr[STEER_LEFT] - target_rot_6[STEER_LEFT];
+  steer_cmd_effort[STEER_LEFT] = pid_left_steering_.Update(steer_error[STEER_LEFT], seconds_since_last_update);
 
-  // steer_ang_curr[STEER_RIGHT] = joints_[STEER_RIGHT]->Position(0);
-  // steer_error[STEER_RIGHT] = steer_ang_curr[STEER_RIGHT] - target_rot[STEER_RIGHT];
-  // steer_cmd_effort[STEER_RIGHT] = pid_left_steering_.Update(steer_error[STEER_RIGHT], seconds_since_last_update);
+  steer_ang_curr[STEER_RIGHT] = joints_[STEER_RIGHT]->Position(0);
+  steer_error[STEER_RIGHT] = steer_ang_curr[STEER_RIGHT] - target_rot_6[STEER_RIGHT];
+  steer_cmd_effort[STEER_RIGHT] = pid_left_steering_.Update(steer_error[STEER_RIGHT], seconds_since_last_update);
 
   // auto steer_wheel_angle = (steer_ang_curr[STEER_LEFT] + steer_ang_curr[STEER_RIGHT]) * 0.5 / steering_ratio_;
   
-  auto steer_wheel_angle = target_rot_ / steering_ratio_;
+  // auto steer_wheel_angle = target_rot_ / steering_ratio_;
   
-  // // if (counter_%100 == 0){
-  // // RCLCPP_INFO(
-  // //       ros_node_->get_logger(),
-  // //       "Past and Present ang_d [%lf] , [%lf]", past_target_rot_ , target_rot_ );
-  // // }     
+  if (counter_%100 == 0){
+  RCLCPP_INFO(
+        ros_node_->get_logger(),
+        "Right Steering CMD [%lf] , [%lf]", right_steering_cmd ,  steer_cmd_effort[STEER_RIGHT]  );
+        RCLCPP_INFO(
+        ros_node_->get_logger(),
+        "Left Steering CMD [%lf] , [%lf]", left_steering_cmd ,  steer_cmd_effort[STEER_LEFT]  );
+  }     
 
-  // if ( fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 100){
-  //   joints_[STEER_LEFT]->SetPosition(0, target_rot[STEER_LEFT] );
-  //   joints_[STEER_RIGHT]->SetPosition(0, target_rot[STEER_RIGHT] );  
-  //   counter_ +=1;    
-  // }
-  // else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 100 ){
-  //     counter_ = 0;
-  // }
-  // else{
-  // joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
-  // joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
+  if ( target_linear_ < 1e-6 && fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 100){
+    joints_[STEER_LEFT]->SetPosition(0, target_rot_6[STEER_LEFT] );
+    joints_[STEER_RIGHT]->SetPosition(0, target_rot_6[STEER_RIGHT] );  
+    counter_ +=1;    
+  }
+  else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 100 ){
+      counter_ = 0;
+  }
+  else{
+  joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
+  joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
     counter_ +=1;
-  // } 
+  } 
 
-  // joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
-  // joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
   double linear_cmd_left = linear_cmd_[REAR_LEFT];
   double linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
   // Current speed assuming equal for left rear and right rear
-  auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
-  auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
-  double linear_diff = linear_vel - target_linear / wheel_radius_;
-  double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
+  // auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
+  // auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
+  // double linear_diff = linear_vel - target_linear / wheel_radius_;
+  // double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
 
+  // joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+  // joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
+  linear_cmd = linear_cmd_right;
   joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
+  linear_cmd = linear_cmd_left;
   joints_[REAR_LEFT]->SetForce(0, linear_cmd);
-
-  past_target_rot_ = target_rot_;
 
   if (joints_.size() == 7) {
     joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
   }
+
+  counter_ +=1;
 
   last_update_time_ = _info.simTime;
   #ifdef IGN_PROFILER_ENABLE
@@ -634,7 +677,7 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   #endif
 }
 
-std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetAckAngles(double phi) {
+std::vector<double> GazeboRosNewAckermannDrivePrivate::GetAckAngles(double phi) {
     std::vector<double> phi_angles;
     double numerator = 2.0 * wheel_base_ * sin(phi);
     phi_angles.assign(6, 0.0);
@@ -645,7 +688,7 @@ std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetAckAngles(double phi
     return phi_angles;
   }
 
-  std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetDiffSpeeds(double vel, double phi) {
+  std::vector<double> GazeboRosNewAckermannDrivePrivate::GetDiffSpeeds(double vel, double phi) {
     std::vector<double> wheel_speeds;
     wheel_speeds.assign(6, 0.0);
     wheel_speeds[REAR_LEFT] = vel * (1.0 - (wheel_separation_ * tan(phi) ) /
@@ -655,14 +698,14 @@ std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetAckAngles(double phi
     return wheel_speeds;
   }
 
-void HTNavGazeboRosAckermannDrivePrivate::OnCmdVel(const geometry_msgs::msg::Twist::SharedPtr _msg)
+void GazeboRosNewAckermannDrivePrivate::OnCmdVel(const geometry_msgs::msg::Twist::SharedPtr _msg)
 {
   std::lock_guard<std::mutex> scoped_lock(lock_);
   target_linear_ = _msg->linear.x;
   target_rot_ = _msg->angular.z;
 }
 
-double HTNavGazeboRosAckermannDrivePrivate::CollisionRadius(const gazebo::physics::CollisionPtr & _coll)
+double GazeboRosNewAckermannDrivePrivate::CollisionRadius(const gazebo::physics::CollisionPtr & _coll)
 {
   if (!_coll || !(_coll->GetShape())) {
     return 0;
@@ -679,7 +722,7 @@ double HTNavGazeboRosAckermannDrivePrivate::CollisionRadius(const gazebo::physic
   return 0;
 }
 
-void HTNavGazeboRosAckermannDrivePrivate::UpdateOdometryWorld()
+void GazeboRosNewAckermannDrivePrivate::UpdateOdometryWorld()
 {
   auto prev_x = odom_.pose.pose.position.x;
   auto prev_y = odom_.pose.pose.position.y;
@@ -700,7 +743,7 @@ void HTNavGazeboRosAckermannDrivePrivate::UpdateOdometryWorld()
   odom_.twist.twist.linear.y = cosf(yaw) * linear.Y() - sinf(yaw) * linear.X();
 }
 
-void HTNavGazeboRosAckermannDrivePrivate::PublishOdometryTf(const gazebo::common::Time & _current_time)
+void GazeboRosNewAckermannDrivePrivate::PublishOdometryTf(const gazebo::common::Time & _current_time)
 {
   geometry_msgs::msg::TransformStamped msg;
   msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(_current_time);
@@ -713,7 +756,7 @@ void HTNavGazeboRosAckermannDrivePrivate::PublishOdometryTf(const gazebo::common
   transform_broadcaster_->sendTransform(msg);
 }
 
-void HTNavGazeboRosAckermannDrivePrivate::PublishWheelsTf(const gazebo::common::Time & _current_time)
+void GazeboRosNewAckermannDrivePrivate::PublishWheelsTf(const gazebo::common::Time & _current_time)
 {
   for (const auto & joint : joints_) {
     auto pose = joint->GetChild()->WorldPose() - model_->WorldPose();
@@ -729,7 +772,7 @@ void HTNavGazeboRosAckermannDrivePrivate::PublishWheelsTf(const gazebo::common::
   }
 }
 
-void HTNavGazeboRosAckermannDrivePrivate::PublishOdometryMsg(const gazebo::common::Time & _current_time)
+void GazeboRosNewAckermannDrivePrivate::PublishOdometryMsg(const gazebo::common::Time & _current_time)
 {
   // Set covariance
   odom_.pose.covariance[0] = covariance_[0];
@@ -754,5 +797,5 @@ void HTNavGazeboRosAckermannDrivePrivate::PublishOdometryMsg(const gazebo::commo
   // Publish
   odometry_pub_->publish(odom_);
 }
-GZ_REGISTER_MODEL_PLUGIN(HTNavGazeboRosAckermannDrive)
+GZ_REGISTER_MODEL_PLUGIN(GazeboRosNewAckermannDrive)
 }  // namespace gazebo_plugins
