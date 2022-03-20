@@ -21,6 +21,7 @@
 
 #include <string>
 #include <memory>
+#include "ht_nav_config.hpp"
 
 namespace gazebo_plugins
 {

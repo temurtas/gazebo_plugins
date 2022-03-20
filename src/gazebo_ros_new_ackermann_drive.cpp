@@ -549,29 +549,29 @@ std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_
   linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
   linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
 
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Lin vel Old vs New [%lf] , [%lf]", linear_vel_[REAR_LEFT] * wheel_radius_ , linear_vel * wheel_radius_);
-  }    
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Lin vel Old vs New [%lf] , [%lf]", linear_vel_[REAR_LEFT] * wheel_radius_ , linear_vel * wheel_radius_);
+  // }    
 
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Target vel Old vs New [%lf] , [%lf]", target_linear_vel_[REAR_LEFT] , target_linear );
-  }    
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Target vel Old vs New [%lf] , [%lf]", target_linear_vel_[REAR_LEFT] , target_linear );
+  // }    
 
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Lin Diff New vs Old [%lf] , [%lf]", linear_diff_[REAR_LEFT]  , linear_diff );
-  }   
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Lin Diff New vs Old [%lf] , [%lf]", linear_diff_[REAR_LEFT]  , linear_diff );
+  // }   
 
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Lin CMD New vs Old [%lf] , [%lf]", linear_cmd_[REAR_LEFT]  , linear_cmd );
-  }   
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Lin CMD New vs Old [%lf] , [%lf]", linear_cmd_[REAR_LEFT]  , linear_cmd );
+  // }   
 
   auto target_rot = target_rot_ * copysign(1.0, target_linear_);
   target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
@@ -626,21 +626,24 @@ std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_
   
   // auto steer_wheel_angle = target_rot_ / steering_ratio_;
   
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Right Steering CMD [%lf] , [%lf]", right_steering_cmd ,  steer_cmd_effort[STEER_RIGHT]  );
-        RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Left Steering CMD [%lf] , [%lf]", left_steering_cmd ,  steer_cmd_effort[STEER_LEFT]  );
-  }     
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Right Steering CMD [%lf] , [%lf]", right_steering_cmd ,  steer_cmd_effort[STEER_RIGHT]  );
+  //       RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Left Steering CMD [%lf] , [%lf]", left_steering_cmd ,  steer_cmd_effort[STEER_LEFT]  );
+  // }     
 
-  if ( target_linear_ < 1e-6 && fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 100){
+  (void)right_steering_cmd;
+  (void)left_steering_cmd;
+
+  if ( target_linear_ < 1e-6 && fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 25){
     joints_[STEER_LEFT]->SetPosition(0, target_rot_6[STEER_LEFT] );
     joints_[STEER_RIGHT]->SetPosition(0, target_rot_6[STEER_RIGHT] );  
     counter_ +=1;    
   }
-  else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 100 ){
+  else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 25 ){
       counter_ = 0;
   }
   else{

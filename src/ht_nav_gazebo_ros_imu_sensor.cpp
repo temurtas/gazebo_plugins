@@ -41,8 +41,10 @@ public:
   gazebo_ros::Node::SharedPtr ros_node_;
   /// Publish for imu message
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr ideal_pub_;
   /// IMU message modified each update
   sensor_msgs::msg::Imu::SharedPtr msg_;
+  sensor_msgs::msg::Imu::SharedPtr ideal_msg_;
   /// IMU sensor this plugin is attached to
   gazebo::sensors::ImuSensorPtr sensor_;
   /// Event triggered when sensor updates
@@ -84,6 +86,8 @@ public:
   std::vector<double> gyro_data_;
   std::vector<double> acc_data_err_;
   std::vector<double> gyro_data_err_;
+
+  FILE *fptr;
 
   int init_flag_ = 0;
   int data_counter_ = 0;
@@ -232,11 +236,16 @@ void HTNavGazeboRosImuSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::Elem
   impl_->pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
     "~/out", qos.get_publisher_qos("~/out", rclcpp::SensorDataQoS().reliable()));
 
+  impl_->ideal_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
+    "~/out_ideal", qos.get_publisher_qos("~/out_ideal", rclcpp::SensorDataQoS().reliable()));
+
   // Create message to be reused
   auto msg = std::make_shared<sensor_msgs::msg::Imu>();
+  auto ideal_msg = std::make_shared<sensor_msgs::msg::Imu>();
 
   // Get frame for message
   msg->header.frame_id = gazebo_ros::SensorFrameID(*_sensor, *_sdf);
+  ideal_msg->header.frame_id = gazebo_ros::SensorFrameID(*_sensor, *_sdf);
 
   // Fill covariances
   // TODO(anyone): covariance for IMU's orientation once this is added to gazebo
@@ -256,6 +265,21 @@ void HTNavGazeboRosImuSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::Elem
 
   impl_->msg_ = msg;
 
+  ideal_msg->angular_velocity_covariance[0] =
+    gazebo_ros::NoiseVariance(impl_->sensor_->Noise(SNT::IMU_ANGVEL_X_NOISE_RADIANS_PER_S));
+  ideal_msg->angular_velocity_covariance[4] =
+    gazebo_ros::NoiseVariance(impl_->sensor_->Noise(SNT::IMU_ANGVEL_Y_NOISE_RADIANS_PER_S));
+  ideal_msg->angular_velocity_covariance[8] =
+    gazebo_ros::NoiseVariance(impl_->sensor_->Noise(SNT::IMU_ANGVEL_Z_NOISE_RADIANS_PER_S));
+  ideal_msg->linear_acceleration_covariance[0] =
+    gazebo_ros::NoiseVariance(impl_->sensor_->Noise(SNT::IMU_LINACC_X_NOISE_METERS_PER_S_SQR));
+  ideal_msg->linear_acceleration_covariance[4] =
+    gazebo_ros::NoiseVariance(impl_->sensor_->Noise(SNT::IMU_LINACC_Y_NOISE_METERS_PER_S_SQR));
+  ideal_msg->linear_acceleration_covariance[8] =
+    gazebo_ros::NoiseVariance(impl_->sensor_->Noise(SNT::IMU_LINACC_Z_NOISE_METERS_PER_S_SQR));
+
+  impl_->ideal_msg_ = ideal_msg;
+
   impl_->sensor_update_event_ = impl_->sensor_->ConnectUpdated(
     std::bind(&HTNavGazeboRosImuSensorPrivate::OnUpdate, impl_.get()));
 }
@@ -271,17 +295,25 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
 
   int i = 0;
 
-  if (data_counter_ % 100 == 0)
-  {
-    RCLCPP_INFO(
-      ros_node_->get_logger(), "Acc Bias std [%f]", acc_bias_std_ );
+  // if (data_counter_ % 100 == 0)
+  // {
+  //   RCLCPP_INFO(
+  //     ros_node_->get_logger(), "Acc Bias std [%f]", acc_bias_std_ );
 
-    RCLCPP_INFO(
-      ros_node_->get_logger(), "Init flag [%d]", init_flag_ );
-  }
+  //   RCLCPP_INFO(
+  //     ros_node_->get_logger(), "Init flag [%d]", init_flag_ );
+  // }
 
   if (init_flag_ == 0)
   {
+
+    fptr = fopen(base_path"imu_errors_added.txt", "w");
+    if (fptr == NULL)
+    {
+      RCLCPP_ERROR(ros_node_->get_logger(), "Could not open file !");
+      return;
+    }
+    
     for (i = 0; i < 3; i++)
     {
     acc_bias_[i] = GaussianKernel(0, acc_bias_std_) * 9.81 * 1e-3;              // mg --> m/s^2
@@ -289,6 +321,22 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
     acc_sf_[i] = GaussianKernel(0, acc_sf_std_) * 1e-6;                         // ppm -> unitless
     gyro_sf_[i] = GaussianKernel(0, gyro_sf_std_) * 1e-6;                       // ppm -> unitless
     }   
+
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", acc_bias_[i] / 9.81 *1e3 ); // m/s^2 --> mg
+    }
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", gyro_drift_[i] * 57.295779 * 3600.0 ); // rad/s --> deg/hr 
+    }
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", acc_sf_[i] *1e6 );     // unitless --> ppm
+    }
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", gyro_sf_[i] *1e6 );    // unitless --> ppm
+    }
+
+    fprintf(fptr,"\n");
+
     acc_rw_coeff_ = GaussianKernel(0, acc_rw_std_) * 0.3048 / 60.0 * sqrt(delta_t_) ; // ft/s/rt-hr --> m/s^2  
     gyro_rw_coeff_ = GaussianKernel(0, gyro_rw_std_) / 57.295779 / 3600.0 / 60.0 * sqrt(delta_t_); // deg/rt-hr --> rad/s
 
@@ -301,11 +349,11 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
     gyro_rw_[i] = GaussianKernel(0, gyro_rw_coeff_);
   }
   
-  if (data_counter_ % 100 == 0)
-  {
-    RCLCPP_INFO(
-      ros_node_->get_logger(), "Acc Bias X [%f]", acc_bias_[0] );
-  }
+  // if (data_counter_ % 100 == 0)
+  // {
+  //   RCLCPP_INFO(
+  //     ros_node_->get_logger(), "Acc Bias X [%f]", acc_bias_[0] );
+  // }
 
   accelerometer_data = sensor_->LinearAcceleration();
   gyroscope_data = sensor_->AngularVelocity();
@@ -318,11 +366,11 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
   gyro_data_[1] = gyroscope_data.Y();
   gyro_data_[2] = gyroscope_data.Z();
 
-  if (data_counter_ % 100 == 0)
-  {
-    RCLCPP_INFO(
-      ros_node_->get_logger(), "Acc Bias [%f %f %f]", acc_bias_[0], acc_bias_[1], acc_bias_[2] );
-  }
+  // if (data_counter_ % 100 == 0)
+  // {
+  //   RCLCPP_INFO(
+  //     ros_node_->get_logger(), "Acc Bias [%f %f %f]", acc_bias_[0], acc_bias_[1], acc_bias_[2] );
+  // }
 
   for (i = 0; i < 3; i++)
   {
@@ -342,13 +390,18 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
   msg_->header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
     sensor_->LastUpdateTime());
   msg_->orientation =
-  //   gazebo_ros::Convert<geometry_msgs::msg::Quaternion>(sensor_->Orientation());
+     gazebo_ros::Convert<geometry_msgs::msg::Quaternion>(sensor_->Orientation());
   // msg_->angular_velocity = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
   //   sensor_->AngularVelocity());
   // msg_->linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
   //   sensor_->LinearAcceleration());
 
-  gazebo_ros::Convert<geometry_msgs::msg::Quaternion>(sensor_->Orientation());
+  ideal_msg_->angular_velocity = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
+    gyroscope_data);
+  ideal_msg_->linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
+    accelerometer_data);
+
+
   msg_->angular_velocity = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
     gyroscope_data_err);
   msg_->linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
@@ -362,6 +415,7 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
 #endif
   // Publish message
   pub_->publish(*msg_);
+  ideal_pub_->publish(*ideal_msg_);
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_END();
 #endif
