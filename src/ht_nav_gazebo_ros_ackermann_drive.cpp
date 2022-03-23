@@ -613,6 +613,10 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   double linear_cmd_left = linear_cmd_[REAR_LEFT];
   double linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
+
+  (void) linear_cmd_left;
+  (void) linear_cmd_right;
+
   // Current speed assuming equal for left rear and right rear
   auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
   auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
