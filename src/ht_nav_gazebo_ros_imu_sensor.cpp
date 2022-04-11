@@ -234,10 +234,10 @@ void HTNavGazeboRosImuSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::Elem
   }
 
   impl_->pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
-    "~/out", qos.get_publisher_qos("~/out", rclcpp::SensorDataQoS().reliable()));
+    "~/out", qos.get_publisher_qos("~/out", rclcpp::SensorDataQoS().best_effort()));
 
   impl_->ideal_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
-    "~/out_ideal", qos.get_publisher_qos("~/out_ideal", rclcpp::SensorDataQoS().reliable()));
+    "~/out_ideal", qos.get_publisher_qos("~/out_ideal", rclcpp::SensorDataQoS().best_effort()));
 
   // Create message to be reused
   auto msg = std::make_shared<sensor_msgs::msg::Imu>();

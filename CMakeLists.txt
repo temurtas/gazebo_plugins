@@ -87,6 +87,25 @@ if(ENABLE_PROFILER)
   target_link_libraries(ht_nav_gazebo_ros_joint_state_publisher ${ignition-common3_LIBRARIES})
 endif()
 
+
+# ht_nav_gazebo_ros_link_state_publisher
+add_library(ht_nav_gazebo_ros_link_state_publisher SHARED
+  src/ht_nav_gazebo_ros_link_state_publisher.cpp
+)
+target_include_directories(ht_nav_gazebo_ros_link_state_publisher PUBLIC include)
+ament_target_dependencies(ht_nav_gazebo_ros_link_state_publisher
+  "gazebo_dev"
+  "gazebo_ros"
+  "rclcpp"
+  "sensor_msgs"
+)
+ament_export_libraries(ht_nav_gazebo_ros_link_state_publisher)
+if(ENABLE_PROFILER)
+  target_include_directories(ht_nav_gazebo_ros_link_state_publisher PUBLIC ${ignition-common3_INCLUDE_DIRS})
+  target_link_libraries(ht_nav_gazebo_ros_link_state_publisher ${ignition-common3_LIBRARIES})
+endif()
+
+
 # gazebo_ros_diff_drive
 add_library(gazebo_ros_diff_drive SHARED
   src/gazebo_ros_diff_drive.cpp
@@ -212,6 +231,22 @@ ament_export_libraries(ht_nav_gazebo_ros_imu_sensor)
 if(ENABLE_PROFILER)
   target_include_directories(ht_nav_gazebo_ros_imu_sensor PUBLIC ${ignition-common3_INCLUDE_DIRS})
   target_link_libraries(ht_nav_gazebo_ros_imu_sensor ${ignition-common3_LIBRARIES})
+endif()
+
+# ht_nav_gazebo_ros_gps_sensor
+add_library(ht_nav_gazebo_ros_gps_sensor SHARED
+  src/ht_nav_gazebo_ros_gps_sensor.cpp
+)
+target_include_directories(ht_nav_gazebo_ros_gps_sensor PUBLIC include)
+ament_target_dependencies(ht_nav_gazebo_ros_gps_sensor
+  "gazebo_ros"
+  "sensor_msgs"
+  "gazebo_dev"
+)
+ament_export_libraries(ht_nav_gazebo_ros_gps_sensor)
+if(ENABLE_PROFILER)
+  target_include_directories(ht_nav_gazebo_ros_gps_sensor PUBLIC ${ignition-common3_INCLUDE_DIRS})
+  target_link_libraries(ht_nav_gazebo_ros_gps_sensor ${ignition-common3_LIBRARIES})
 endif()
 
 # gazebo_ros_gps_sensor
@@ -578,8 +613,10 @@ install(TARGETS
     gazebo_ros_ackermann_drive
     gazebo_ros_new_ackermann_drive
     ht_nav_gazebo_ros_ackermann_drive
+    ht_nav_gazebo_ros_link_state_publisher
     ht_nav_gazebo_ros_joint_state_publisher
     ht_nav_gazebo_ros_imu_sensor
+    ht_nav_gazebo_ros_gps_sensor
     gazebo_ros_bumper
     gazebo_ros_camera
     gazebo_ros_diff_drive
