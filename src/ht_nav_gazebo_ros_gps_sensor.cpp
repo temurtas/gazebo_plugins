@@ -23,10 +23,12 @@
 #include <ignition/common/Profiler.hh>
 #endif
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <gazebo_plugins/ht_nav_config.hpp>
 
 #include <iostream>
 #include <memory>
 #include <string>
+#include "math.h"
 
 #define tau_i 0.01	// sampling period
 #define tau_s 0.01  // If IMU data is diff not acc, use it to convert
@@ -55,16 +57,29 @@ public:
   gazebo::sensors::GpsSensorPtr sensor_;
   /// Event triggered when sensor updates
   gazebo::event::ConnectionPtr sensor_update_event_;
+  /// Publish latest gps data to ROS
+  void OnUpdate();
 
   double RN_calculator(double R_N_input);
   double RE_calculator(double R_E_input);
   double GaussianKernel(double mu, double sigma);
+  std::vector<double> pos_bias_ ;
+  std::vector<double> pos_drift_ ;
+  std::vector<double> pos_current_drift_ ;
   std::vector<double> pos_err_ ;
 
+  double pos_drift_freq_ = 0.0;
+  double pos_bias_std_ = 0.0;
+  double pos_drift_std_ = 0.0;
   double gaussian_noise_ = 0.0;
-  
-  /// Publish latest gps data to ROS
-  void OnUpdate();
+  double delta_t_ = 0.0;
+  double pub_freq_ = 0.0;
+
+  FILE *fptr;
+
+  int init_flag_ = 0;
+  int data_counter_ = 0;
+
 };
 
 HTNavGazeboRosGpsSensor::HTNavGazeboRosGpsSensor()
@@ -88,7 +103,30 @@ void HTNavGazeboRosGpsSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::Elem
     RCLCPP_ERROR(impl_->ros_node_->get_logger(), "Parent is not a GPS sensor. Exiting.");
     return;
   }
+/* *************** NOISE Parameters**************************************************** */
 
+  if (_sdf->HasElement("updateRateHZ"))
+  {
+    impl_->pub_freq_ =  _sdf->Get<double>("updateRateHZ");
+    impl_->delta_t_ = 1 / impl_->pub_freq_;
+  }
+  else
+  {
+    impl_->pub_freq_ = 100.0;
+    impl_->delta_t_ = 1 / impl_->pub_freq_;
+    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <updateRateHZ>, set to default: 100.0 ");
+  }
+
+  if (_sdf->HasElement("posDriftFreq"))
+  {
+    impl_->pos_drift_freq_ =  _sdf->Get<double>("posDriftFreq");
+  }
+  else
+  {
+    impl_->pos_drift_freq_ = 1500.0;
+    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <posDriftFreq>, set to default: 1500.0 ");
+  }
+  
   if (_sdf->HasElement("gaussianNoise"))
   {
     impl_->gaussian_noise_ =  _sdf->Get<double>("gaussianNoise");
@@ -99,10 +137,33 @@ void HTNavGazeboRosGpsSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::Elem
     RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <gaussianNoise>, set to default: 0.0 ");
   }
 
+  if (_sdf->HasElement("posBiasStd"))
+  {
+    impl_->pos_bias_std_ =  _sdf->Get<double>("posBiasStd");
+  }
+  else
+  {
+    impl_->pos_bias_std_ = 0.0;
+    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <posBias>, set to default: 0.0 ");
+  }
+
+  if (_sdf->HasElement("posDriftStd"))
+  {
+    impl_->pos_drift_std_=  _sdf->Get<double>("posDriftStd");
+  }
+  else
+  {
+    impl_->pos_drift_std_ = 0.0;
+    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <posDrift>, set to default: 0.0 ");
+  }
+
+  impl_->pos_bias_.assign(3, 0.0);
+  impl_->pos_drift_.assign(3, 0.0);
+  impl_->pos_current_drift_.assign(3, 0.0);
   impl_->pos_err_.assign(3, 0.0);
 
-  impl_->ideal_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::NavSatFix>(
-    "~/ideal_out", qos.get_publisher_qos("~/out", rclcpp::SensorDataQoS().best_effort()));
+  // impl_->ideal_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::NavSatFix>(
+  //   "~/ideal_out", qos.get_publisher_qos("~/out", rclcpp::SensorDataQoS().best_effort()));
 
   impl_->pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::NavSatFix>(
     "~/out", qos.get_publisher_qos("~/out", rclcpp::SensorDataQoS().best_effort()));
@@ -143,23 +204,85 @@ void HTNavGazeboRosGpsSensorPrivate::OnUpdate()
   #endif
   // Fill message with latest sensor data
 
-  msg_->header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
-    sensor_->LastUpdateTime());
+  // msg_->header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
+  //   sensor_->LastUpdateTime());
+  // // msg_->latitude = sensor_->Latitude().Degree();
+  // // msg_->longitude = sensor_->Longitude().Degree();
+  // // msg_->altitude = sensor_->Altitude();
+
   // msg_->latitude = sensor_->Latitude().Degree();
   // msg_->longitude = sensor_->Longitude().Degree();
   // msg_->altitude = sensor_->Altitude();
 
-  msg_->latitude = sensor_->Latitude().Degree();
-  msg_->longitude = sensor_->Longitude().Degree();
-  msg_->altitude = sensor_->Altitude();
+  // // Publish message
+  // ideal_pub_->publish(*msg_);
 
-  // Publish message
-  ideal_pub_->publish(*msg_);
+  if (init_flag_ == 0)
+  {
+
+    fptr = fopen(base_path"gps_errors_added.txt", "w");
+    if (fptr == NULL)
+    {
+      RCLCPP_ERROR(ros_node_->get_logger(), "Could not open file !");
+      return;
+    }
+    
+    for (i = 0; i < 3; i++)
+    {
+      pos_bias_[i] = GaussianKernel(0, pos_bias_std_);              
+    }   
+
+    for (i = 0; i < 3; i++)
+    {
+      pos_drift_[i] = GaussianKernel(0, pos_drift_std_);              
+    }   
+
+    for (i = 0; i < 3; i++)
+    {
+      pos_current_drift_[i] = pos_drift_[i];            
+    }   
+
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", pos_bias_[i]); 
+    }
+
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", pos_drift_[i]); 
+    }
+
+    fprintf(fptr,"\n");
+
+    init_flag_ = 1;
+  }else{
+    // double temp_var[3];
+    double temp_var2[3];
+    for (i = 0; i < 3; i++)
+    {
+      // temp_var[i] = exp(- 1/pos_drift_freq_ * delta_t_ );
+      temp_var2[i] = GaussianKernel(0, sqrt(2 / pos_drift_freq_) * pos_drift_[i] ) * delta_t_ ;
+      pos_current_drift_[i] = pos_current_drift_[i] * exp(- 1/pos_drift_freq_ * delta_t_ ) + temp_var2[i]  ;              
+    } 
+
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", temp_var2[i]); 
+    }
+
+    for (i = 0; i < 3; i++){
+      fprintf(fptr,"%lf\t", pos_current_drift_[i]); 
+    }
+
+    fprintf(fptr,"\n");  
+  }
 
   for (i = 0; i < 3; i++)
   {
-    pos_err_[i] = GaussianKernel(0, gaussian_noise_);
+    pos_err_[i] = pos_bias_[i] + pos_current_drift_[i];
   }
+
+  // for (i = 0; i < 3; i++)
+  // {
+  //   pos_err_[i] = GaussianKernel(0, gaussian_noise_);
+  // }
 
   double RN = RN_calculator(sensor_->Latitude().Degree() * DEG2RAD);
   double RE = RE_calculator(sensor_->Latitude().Degree() * DEG2RAD);
@@ -169,9 +292,9 @@ void HTNavGazeboRosGpsSensorPrivate::OnUpdate()
 
   msg_->header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
     sensor_->LastUpdateTime());
-  msg_->latitude = sensor_->Latitude().Degree() + lat_err;
+  msg_->latitude  = sensor_->Latitude().Degree() + lat_err;
   msg_->longitude = sensor_->Longitude().Degree() + lon_err;
-  msg_->altitude = sensor_->Altitude() + pos_err_[2];
+  msg_->altitude  = sensor_->Altitude() + pos_err_[2];
 
   // Publish message
   pub_->publish(*msg_);

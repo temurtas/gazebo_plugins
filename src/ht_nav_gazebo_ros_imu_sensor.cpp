@@ -25,6 +25,7 @@
 #include <ignition/common/Profiler.hh>
 #endif
 #include <sensor_msgs/msg/imu.hpp>
+#include <gazebo_plugins/ht_nav_config.hpp>
 
 #include <iostream>
 #include <memory>
