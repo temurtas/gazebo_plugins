@@ -310,12 +310,12 @@ void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::Upd
   // // Publish
   // publishers[0]->publish(link_state);
 
-  if (data_counter_ % 100 == 0)
-  {
-  double yaw = link_state.effort[2] * 180.0 / 3.14;
-  RCLCPP_INFO(
-    ros_node_->get_logger(), "Yaw Angle [%f]", yaw );
-  }
+  // if (data_counter_ % 100 == 0)
+  // {
+  // double yaw = link_state.effort[2] * 180.0 / 3.14;
+  // RCLCPP_INFO(
+  //   ros_node_->get_logger(), "Yaw Angle [%f]", yaw );
+  // }
 
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_END();
