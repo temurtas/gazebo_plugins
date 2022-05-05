@@ -287,6 +287,8 @@ void HTNavGazeboRosGpsSensorPrivate::OnUpdate()
   double RN = RN_calculator(sensor_->Latitude().Degree() * DEG2RAD);
   double RE = RE_calculator(sensor_->Latitude().Degree() * DEG2RAD);
 
+  
+
   double lat_err = RAD2DEG*(pos_err_[0] / RN);
   double lon_err = RAD2DEG*(pos_err_[1] / RE / cos(sensor_->Latitude().Degree() * DEG2RAD) );
 

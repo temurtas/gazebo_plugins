@@ -189,10 +189,10 @@ void HTNavGazeboRosJointStatePublisherPrivate::OnUpdate(const gazebo::common::Up
     else{
       velocity = joint->GetVelocity(0);
     }  
-    double position = joint->Position(0);
+    double position = joint->Position(0);  
     joint_state.name[i] = joint->GetName();
-    joint_state.position[i] = position;
-    joint_state.velocity[i] = velocity;
+    joint_state.position[i] = - position; // positive rotation is clockwise (ENU -> NED transformation) // <HT>
+    joint_state.velocity[i] = velocity;   
   }
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_END();

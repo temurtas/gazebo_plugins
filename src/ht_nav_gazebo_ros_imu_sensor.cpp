@@ -282,7 +282,10 @@ void HTNavGazeboRosImuSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::Elem
   impl_->ideal_msg_ = ideal_msg;
 
   impl_->sensor_update_event_ = impl_->sensor_->ConnectUpdated(
-    std::bind(&HTNavGazeboRosImuSensorPrivate::OnUpdate, impl_.get()));
+    std::bind(&HTNavGazeboRosImuSensorPrivate::OnUpdate, impl_.get() ));
+
+  // impl_->sensor_update_event_ = gazebo::event::Events::ConnectWorldUpdateBegin(
+  //   std::bind(&HTNavGazeboRosImuSensorPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
 }
 
 
@@ -397,6 +400,11 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
   // msg_->linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
   //   sensor_->LinearAcceleration());
 
+  ideal_msg_->header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
+    sensor_->LastUpdateTime());
+  ideal_msg_->orientation =
+     gazebo_ros::Convert<geometry_msgs::msg::Quaternion>(sensor_->Orientation());
+  
   ideal_msg_->angular_velocity = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(
     gyroscope_data);
   ideal_msg_->linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(

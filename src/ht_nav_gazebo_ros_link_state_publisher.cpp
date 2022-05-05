@@ -68,11 +68,15 @@ public:
   /// \param[in] info Updated simulation info.
   void OnUpdate(const gazebo::common::UpdateInfo & info);
   void LinkStateSolver(sensor_msgs::msg::JointState *link_state, gazebo::physics::LinkPtr link);
+  // void LinkStateSolver(sensor_msgs::msg::JointState *link_state, gazebo::physics::LinkPtr link, double sim_time);
   /// A pointer to the GazeboROS node.
   gazebo_ros::Node::SharedPtr ros_node_;
 
   /// Joint state publisher.
   std::array<rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr, 5> publishers;
+
+  /// Joint state publisher.
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr imu_meas_pub_;
 
   // rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr front_right_wheel_state_pub_;
   // rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr front_left_wheel_state_pub_;
@@ -223,6 +227,10 @@ void HTNavGazeboRosLinkStatePublisher::Load(gazebo::physics::ModelPtr model, sdf
   impl_->publishers[HTNavGazeboRosLinkStatePublisherPrivate::IMU_LINK] = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
       "imu_link_states", qos.get_publisher_qos("imu_link_states", rclcpp::QoS(1000)));    
 
+    // Joint state publisher
+  impl_->imu_meas_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
+    "imu_link_measurements", qos.get_publisher_qos("imu_link_measurements", rclcpp::QoS(1000)));
+
   // Callback on every iteration
   impl_->update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
     std::bind(&HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
@@ -274,6 +282,8 @@ void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::Upd
     // REAR_LEFT,   // Rear left wheel
     // IMU_LINK     // Steering wheel
 
+
+  // double sim_time = current_time.Double();
   for (i = 0; i < (int)(links_.size()); i++)
   {
     link = links_[i];
@@ -281,6 +291,44 @@ void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::Upd
     // Publish
     publishers[i]->publish(link_state);
   }
+
+  sensor_msgs::msg::JointState imu_measurement;
+  imu_measurement.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(current_time);
+
+  link = links_[IMU_LINK];
+
+  imu_measurement.name.resize(3);
+  imu_measurement.position.resize(3);
+  imu_measurement.velocity.resize(3);
+  imu_measurement.effort.resize(3);
+
+  ignition::math::Vector3d ang_acc;
+  ignition::math::Vector3d lin_acc;
+  ignition::math::Vector3d ang_vel;
+  ignition::math::Vector3d velocity;
+  ignition::math::Pose3d position;
+  
+  velocity = link->WorldLinearVel(); 
+  position = link->WorldPose();
+  ang_vel  = link->WorldAngularVel();
+  lin_acc  = link->WorldLinearAccel ();
+  ang_acc  = link->WorldAngularAccel();
+
+  imu_measurement.name[0]     = link->GetName();
+  imu_measurement.name[1]     = link->GetName();
+  imu_measurement.name[2]     = link->GetName();
+  imu_measurement.position[0] = ang_vel.X();
+  imu_measurement.position[1] = ang_vel.Y();
+  imu_measurement.position[2] = ang_vel.Z();
+  imu_measurement.velocity[0] = lin_acc.X();
+  imu_measurement.velocity[1] = lin_acc.Y();
+  imu_measurement.velocity[2] = lin_acc.Z();
+  imu_measurement.effort[0]   = ang_acc.X();
+  imu_measurement.effort[1]   = ang_acc.Y();
+  imu_measurement.effort[2]   = ang_acc.Z();
+  
+  imu_meas_pub_->publish(imu_measurement);
+
   // velocity = link->WorldLinearVel();        
   // position = link->WorldCoGPose();
   // quaternion = position.Rot();
@@ -331,7 +379,6 @@ void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::Upd
   data_counter_ += 1;
 }
 
-
 void HTNavGazeboRosLinkStatePublisherPrivate::LinkStateSolver(sensor_msgs::msg::JointState *link_state, gazebo::physics::LinkPtr link)
 {
   link_state->name.resize(3);
@@ -339,17 +386,13 @@ void HTNavGazeboRosLinkStatePublisherPrivate::LinkStateSolver(sensor_msgs::msg::
   link_state->velocity.resize(3);
   link_state->effort.resize(3);
 
+  ignition::math::Vector3d ang_vel;
   ignition::math::Vector3d velocity;
   ignition::math::Pose3d position;
-  // ignition::math::Quaternion quaternion;
-  // double euler[3]; 
 
   velocity = link->WorldLinearVel();        
-  position = link->WorldCoGPose();
-  // quaternion = position.Rot();
-  // euler[0] = quaternion.Roll();
-  // euler[1] = quaternion.Pitch();
-  // euler[2] = quaternion.Yaw();
+  position = link->WorldPose();
+
   
   link_state->name[0] = link->GetName();
   link_state->name[1] = link->GetName();
