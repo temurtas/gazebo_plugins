@@ -298,6 +298,12 @@ void HTNavGazeboRosGpsSensorPrivate::OnUpdate()
   msg_->longitude = sensor_->Longitude().Degree() + lon_err;
   msg_->altitude  = sensor_->Altitude() + pos_err_[2];
 
+  //ignition::math::Vector3d gps_vel;
+  //gps_vel = sensor_->VelocityENU();
+  // // gps_vel[0] = sensor_->VelocityNorth(); 
+  // // gps_vel[1] = sensor_->VelocityEast();
+  // // gps_vel[2] = - sensor_->VelocityUp();
+
   // Publish message
   pub_->publish(*msg_);
 
