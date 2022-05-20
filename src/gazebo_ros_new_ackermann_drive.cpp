@@ -532,7 +532,7 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
   linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
   linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
 
-std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
+  std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
 
   // if (counter_%100 == 0){
   // RCLCPP_INFO(
@@ -573,15 +573,23 @@ std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_
   //       "Lin CMD New vs Old [%lf] , [%lf]", linear_cmd_[REAR_LEFT]  , linear_cmd );
   // }   
 
-  auto target_rot = target_rot_ * copysign(1.0, target_linear_);
-  target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
+  auto target_rot = target_rot_ ; // * copysign(1.0, target_linear_);
+  // target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
 
   double tanSteer = tan(target_rot);
 
-  auto target_left_steering =
-    atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
-  auto target_right_steering =
+  // Orijinal one
+  // auto target_left_steering =
+    // atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+  // auto target_right_steering =
+    // atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+
+  (void) tanSteer;
+  double target_left_steering = 
     atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+  double target_right_steering = 
+    atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+
 
   auto left_steering_angle = joints_[STEER_LEFT]->Position(0);
   auto right_steering_angle = joints_[STEER_RIGHT]->Position(0);
@@ -595,7 +603,26 @@ std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_
     pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
 
   auto steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
+  
+  if (counter_%100 == 0){
+  RCLCPP_INFO(
+        ros_node_->get_logger(),
+        "FL Yaw vs Ref vs Diff vs Cmd [%lf] , [%lf], [%lf], [%lf]", left_steering_angle  , target_left_steering , (left_steering_diff*(57.29)), left_steering_cmd);
+  }  
 
+
+  // double fl_steer = joints_[STEER_LEFT]->Position(0);
+  // double fr_steer = joints_[STEER_RIGHT]->Position(0);
+
+  // double rl_steer = joints_[REAR_LEFT]->GetAngle(0);
+  // double rr_steer = joints_[REAR_RIGHT]->GetAngle(1);
+
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Steer Angles FL:[%lf], FR,[%lf], RL:[%lf], RR:[%lf]", fl_steer  , fr_steer , rl_steer, rr_steer);
+  // }  
+  
   /* Compute Steering Angle Commands */
   std::vector<double> target_rot_6;
   target_rot_6.assign(6, 0.0);
@@ -635,22 +662,43 @@ std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_
   //       "Left Steering CMD [%lf] , [%lf]", left_steering_cmd ,  steer_cmd_effort[STEER_LEFT]  );
   // }     
 
+
+
+  joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
+  joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
+
+  double fl_lin_vel = linear_vel_[REAR_LEFT]; // * cos(target_left_steering);
+  double fr_lin_vel = linear_vel_[REAR_RIGHT]; // * cos(target_right_steering);
+
+  // if (counter_%20 == 0){
+    joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
+    joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
+
+  // joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+  // joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+
+    // joints_[STEER_RIGHT]->SetVelocity(1, linear_vel_[REAR_RIGHT] );
+
+  // }
+
   (void)right_steering_cmd;
   (void)left_steering_cmd;
 
-  if ( target_linear_ < 1e-6 && fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 25){
-    joints_[STEER_LEFT]->SetPosition(0, target_rot_6[STEER_LEFT] );
-    joints_[STEER_RIGHT]->SetPosition(0, target_rot_6[STEER_RIGHT] );  
-    counter_ +=1;    
-  }
-  else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 25 ){
-      counter_ = 0;
-  }
-  else{
-  joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
-  joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
+  // if ( target_linear_ < 1e-6 && fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 25){
+  //   joints_[STEER_LEFT]->SetPosition(0, target_rot_6[STEER_LEFT] );
+  //   joints_[STEER_RIGHT]->SetPosition(0, target_rot_6[STEER_RIGHT] );  
+  //   counter_ +=1;    
+  // }
+  // else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 25 ){
+  //     counter_ = 0;
+  // }
+  // else{
+  // joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
+  // joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
     counter_ +=1;
-  } 
+  // } 
+
+  (void)steer_cmd_effort;
 
   double linear_cmd_left = linear_cmd_[REAR_LEFT];
   double linear_cmd_right = linear_cmd_[REAR_RIGHT];

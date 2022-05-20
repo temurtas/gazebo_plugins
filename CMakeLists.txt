@@ -105,6 +105,22 @@ if(ENABLE_PROFILER)
   target_link_libraries(ht_nav_gazebo_ros_link_state_publisher ${ignition-common3_LIBRARIES})
 endif()
 
+# ht_nav_gazebo_ros_link_gps_publisher
+add_library(ht_nav_gazebo_ros_link_gps_publisher SHARED
+  src/ht_nav_gazebo_ros_link_gps_publisher.cpp
+)
+target_include_directories(ht_nav_gazebo_ros_link_gps_publisher PUBLIC include)
+ament_target_dependencies(ht_nav_gazebo_ros_link_gps_publisher
+  "gazebo_dev"
+  "gazebo_ros"
+  "rclcpp"
+  "sensor_msgs"
+)
+ament_export_libraries(ht_nav_gazebo_ros_link_gps_publisher)
+if(ENABLE_PROFILER)
+  target_include_directories(ht_nav_gazebo_ros_link_gps_publisher PUBLIC ${ignition-common3_INCLUDE_DIRS})
+  target_link_libraries(ht_nav_gazebo_ros_link_gps_publisher ${ignition-common3_LIBRARIES})
+endif()
 
 # gazebo_ros_diff_drive
 add_library(gazebo_ros_diff_drive SHARED
@@ -614,6 +630,7 @@ install(TARGETS
     gazebo_ros_new_ackermann_drive
     ht_nav_gazebo_ros_ackermann_drive
     ht_nav_gazebo_ros_link_state_publisher
+    ht_nav_gazebo_ros_link_gps_publisher
     ht_nav_gazebo_ros_joint_state_publisher
     ht_nav_gazebo_ros_imu_sensor
     ht_nav_gazebo_ros_gps_sensor
