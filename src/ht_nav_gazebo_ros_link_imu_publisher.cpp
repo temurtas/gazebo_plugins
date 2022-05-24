@@ -36,13 +36,15 @@
 // #include <gazebo/physics/Joint.hh>
 #include <gazebo/physics/Model.hh>
 #include <gazebo/physics/World.hh>
-#include <gazebo_plugins/ht_nav_gazebo_ros_link_state_publisher.hpp>
+#include <gazebo_plugins/ht_nav_gazebo_ros_link_imu_publisher.hpp>
 #include <gazebo_ros/conversions/builtin_interfaces.hpp>
+#include <gazebo_ros/conversions/geometry_msgs.hpp>
 #include <gazebo_ros/node.hpp>
 #ifdef IGN_PROFILER_ENABLE
 #include <ignition/common/Profiler.hh>
 #endif
 #include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 
 #include <memory>
@@ -51,44 +53,27 @@
 
 namespace gazebo_plugins
 {
-class HTNavGazeboRosLinkStatePublisherPrivate
+class HTNavGazeboRosLinkIMUPublisherPrivate
 {
 public:
   /// Indicates which link
-  enum
-  {
-    FRONT_RIGHT, // Front right wheel
-    FRONT_LEFT,  // Front left wheel
-    REAR_RIGHT,  // Rear right wheel
-    REAR_LEFT,   // Rear left wheel
-    IMU_LINK     // Steering wheel
-  };
-
   /// Callback to be called at every simulation iteration.
   /// \param[in] info Updated simulation info.
   void OnUpdate(const gazebo::common::UpdateInfo & info);
   void LinkStateSolver(sensor_msgs::msg::JointState *link_state, gazebo::physics::LinkPtr link);
+  void Euler2Cnb(double c_nb[3][3], double euler_in[3]);
+  void MatrixVectorMult(double vector_res[3], double matrix1[3][3], double vector2[3]);
   // void LinkStateSolver(sensor_msgs::msg::JointState *link_state, gazebo::physics::LinkPtr link, double sim_time);
   /// A pointer to the GazeboROS node.
   gazebo_ros::Node::SharedPtr ros_node_;
 
-  /// Joint state publisher.
-  std::array<rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr, 5> publishers;
+  // sensor_msgs::msg::Imu::SharedPtr msg_;
+  // ignition::math::Vector3d accelerometer_data{0, 0, 0};
+  // ignition::math::Vector3d gyroscope_data{0, 0, 0};
 
   /// Joint state publisher.
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr imu_meas_pub_;
-
-  // rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr front_right_wheel_state_pub_;
-  // rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr front_left_wheel_state_pub_;
-  // rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr rear_right_wheel_state_pub_;
-  // rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr rear_left_wheel_state_pub_;
-  // rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr imu_link_state_pub_;
-
-  // publishers[0] = front_right_wheel_state_pub_;
-  // publishers[1] = front_left_wheel_state_pub_;
-  // publishers[2] = rear_right_wheel_state_pub_;
-  // publishers[3] = rear_left_wheel_state_pub_;
-  // publishers[4] = imu_link_state_pub_;
+  // rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_;
 
   /// Joints being tracked.
   std::vector<gazebo::physics::LinkPtr> links_;
@@ -106,16 +91,16 @@ public:
 
 };
 
-HTNavGazeboRosLinkStatePublisher::HTNavGazeboRosLinkStatePublisher()
-: impl_(std::make_unique<HTNavGazeboRosLinkStatePublisherPrivate>())
+HTNavGazeboRosLinkIMUPublisher::HTNavGazeboRosLinkIMUPublisher()
+: impl_(std::make_unique<HTNavGazeboRosLinkIMUPublisherPrivate>())
 {
 }
 
-HTNavGazeboRosLinkStatePublisher::~HTNavGazeboRosLinkStatePublisher()
+HTNavGazeboRosLinkIMUPublisher::~HTNavGazeboRosLinkIMUPublisher()
 {
 }
 
-void HTNavGazeboRosLinkStatePublisher::Load(gazebo::physics::ModelPtr model, sdf::ElementPtr sdf)
+void HTNavGazeboRosLinkIMUPublisher::Load(gazebo::physics::ModelPtr model, sdf::ElementPtr sdf)
 {
   // ROS node
   impl_->ros_node_ = gazebo_ros::Node::Get(sdf);
@@ -126,55 +111,11 @@ void HTNavGazeboRosLinkStatePublisher::Load(gazebo::physics::ModelPtr model, sdf
   // Joints
   impl_->links_.resize(5);
 
-  auto front_right_wheel =
-    sdf->Get<std::string>("front_right_wheel", "front_right_wheel").first;
-  impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::FRONT_RIGHT] =
-    model->GetLink(front_right_wheel);
-  if (!impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::FRONT_RIGHT]) {
-    RCLCPP_WARN(
-      impl_->ros_node_->get_logger(),
-      "Front Right Wheel [%s] not found.", front_right_wheel.c_str());
-    impl_->ros_node_.reset();
-  }
-
-  auto front_left_wheel =
-    sdf->Get<std::string>("front_left_wheel", "front_left_wheel").first;
-  impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::FRONT_LEFT] =
-    model->GetLink(front_left_wheel);
-  if (!impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::FRONT_LEFT]) {
-    RCLCPP_WARN(
-      impl_->ros_node_->get_logger(),
-      "Front Left Wheel [%s] not found.", front_left_wheel.c_str());
-    impl_->ros_node_.reset();
-  }
-
-  auto rear_right_wheel =
-    sdf->Get<std::string>("rear_right_wheel", "rear_right_wheel").first;
-  impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::REAR_RIGHT] =
-    model->GetLink(rear_right_wheel);
-  if (!impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::REAR_RIGHT]) {
-    RCLCPP_WARN(
-      impl_->ros_node_->get_logger(),
-      "Rear Right Wheel [%s] not found.", rear_right_wheel.c_str());
-    impl_->ros_node_.reset();
-  }
-
-  auto rear_left_wheel =
-    sdf->Get<std::string>("rear_left_wheel", "rear_left_wheel").first;
-  impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::REAR_LEFT] =
-    model->GetLink(rear_left_wheel);
-  if (!impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::REAR_LEFT]) {
-    RCLCPP_WARN(
-      impl_->ros_node_->get_logger(),
-      "Rear Left Wheel [%s] not found.", rear_left_wheel.c_str());
-    impl_->ros_node_.reset();
-  }
-
   auto imu_link =
     sdf->Get<std::string>("imu_link", "imu_link").first;
-  impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::IMU_LINK] =
+  impl_->links_[0] =
     model->GetLink(imu_link);
-  if (!impl_->links_[HTNavGazeboRosLinkStatePublisherPrivate::IMU_LINK]) {
+  if (!impl_->links_[0]) {
     RCLCPP_WARN(
       impl_->ros_node_->get_logger(),
       "IMU Link [%s] not found.", imu_link.c_str());
@@ -198,49 +139,23 @@ void HTNavGazeboRosLinkStatePublisher::Load(gazebo::physics::ModelPtr model, sdf
 
   impl_->last_update_time_ = model->GetWorld()->SimTime();
 
-  // Link state publishers
-  // impl_->front_right_wheel_state_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-  //   "front_right_link_states", qos.get_publisher_qos("front_right_link_states", rclcpp::QoS(1000)));
-  // impl_->front_left_wheel_state_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-  //     "front_left_link_states", qos.get_publisher_qos("front_left_link_states", rclcpp::QoS(1000)));
-  // impl_->rear_right_wheel_state_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-  //     "rear_right_link_states", qos.get_publisher_qos("rear_right_link_states", rclcpp::QoS(1000)));
-  // impl_->rear_left_wheel_state_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-  //     "rear_left_link_states", qos.get_publisher_qos("rear_left_link_states", rclcpp::QoS(1000)));
-  // impl_->imu_link_state_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-  //     "imu_link_states", qos.get_publisher_qos("imu_link_states", rclcpp::QoS(1000)));
-
-    // FRONT_RIGHT, // Front right wheel  // front_right_link_states
-    // FRONT_LEFT,  // Front left wheel   // front_left_link_states
-    // REAR_RIGHT,  // Rear right wheel   // rear_right_link_states
-    // REAR_LEFT,   // Rear left wheel    // rear_left_link_states
-    // IMU_LINK     // Steering wheel     // imu_link_states
-    
-  impl_->publishers[HTNavGazeboRosLinkStatePublisherPrivate::FRONT_RIGHT] = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-    "front_right_link_states", qos.get_publisher_qos("front_right_link_states", rclcpp::QoS(1000)));
-  impl_->publishers[HTNavGazeboRosLinkStatePublisherPrivate::FRONT_LEFT] = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-      "front_left_link_states", qos.get_publisher_qos("front_left_link_states", rclcpp::QoS(1000)));
-  impl_->publishers[HTNavGazeboRosLinkStatePublisherPrivate::REAR_RIGHT] = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-      "rear_right_link_states", qos.get_publisher_qos("rear_right_link_states", rclcpp::QoS(1000)));
-  impl_->publishers[HTNavGazeboRosLinkStatePublisherPrivate::REAR_LEFT] = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-      "rear_left_link_states", qos.get_publisher_qos("rear_left_link_states", rclcpp::QoS(1000)));
-  impl_->publishers[HTNavGazeboRosLinkStatePublisherPrivate::IMU_LINK] = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-      "imu_link_states", qos.get_publisher_qos("imu_link_states", rclcpp::QoS(1000)));    
-
-    // Joint state publisher
+  // IMU Link IMU publisher
   impl_->imu_meas_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
-    "imu_link_measurements", qos.get_publisher_qos("imu_link_measurements", rclcpp::QoS(1000)));
+    "imu_data_link_body", qos.get_publisher_qos("imu_data_link_body", rclcpp::QoS(1000)));
+
+  // impl_->pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
+    // "imu_data_body", qos.get_publisher_qos("imu_data_body", rclcpp::SensorDataQoS().best_effort()));
 
   // Callback on every iteration
   impl_->update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
-    std::bind(&HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
+    std::bind(&HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
 }
 
-void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::UpdateInfo & info)
+void HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate(const gazebo::common::UpdateInfo & info)
 {
-  int i = 0;
+  // int i = 0;
 #ifdef IGN_PROFILER_ENABLE
-  IGN_PROFILE("HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate");
+  IGN_PROFILE("HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate");
 #endif
   gazebo::common::Time current_time = info.simTime;
 
@@ -276,26 +191,13 @@ void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::Upd
 
   gazebo::physics::LinkPtr link;
 
-    // FRONT_RIGHT, // Front right wheel
-    // FRONT_LEFT,  // Front left wheel
-    // REAR_RIGHT,  // Rear right wheel
-    // REAR_LEFT,   // Rear left wheel
-    // IMU_LINK     // Steering wheel
-
-
-  // double sim_time = current_time.Double();
-  for (i = 0; i < (int)(links_.size()); i++)
-  {
-    link = links_[i];
-    LinkStateSolver(&link_state, link);
-    // Publish
-    publishers[i]->publish(link_state);
-  }
+  link = links_[0];
+  LinkStateSolver(&link_state, link);
 
   sensor_msgs::msg::JointState imu_measurement;
   imu_measurement.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(current_time);
 
-  link = links_[IMU_LINK];
+  link = links_[0];
 
   imu_measurement.name.resize(3);
   imu_measurement.position.resize(3);
@@ -314,15 +216,69 @@ void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::Upd
   lin_acc  = link->WorldLinearAccel();
   ang_acc  = link->WorldAngularAccel();
 
+  double C_nb[3][3], euler_in[3];
+  double lin_acc_ref[3], ang_vel_ref[3];
+  double lin_acc_body[3], ang_vel_body[3];
+
+  euler_in[0] = -link_state.effort[1]; 
+  euler_in[1] = -link_state.effort[0]; 
+  euler_in[2] = -link_state.effort[2]; 
+
+  ang_vel_ref[0] = -ang_vel.Y(); 
+  ang_vel_ref[1] = -ang_vel.X(); 
+  ang_vel_ref[2] = -ang_vel.Z(); 
+
+  lin_acc_ref[0] = -lin_acc.Y(); 
+  lin_acc_ref[1] = -lin_acc.X(); 
+  lin_acc_ref[2] = -lin_acc.Z() - 9.80; 
+
+  Euler2Cnb(C_nb, euler_in);
+  MatrixVectorMult(ang_vel_body, C_nb, ang_vel_ref);
+  MatrixVectorMult(lin_acc_body, C_nb, lin_acc_ref);
+
+  // Fill message with latest sensor data
+
+  // accelerometer_data.X() = -lin_acc_body[1];
+  // accelerometer_data.Y() = -lin_acc_body[0];
+  // accelerometer_data.Z() = -lin_acc_body[2];
+
+  // gyroscope_data.X() = -ang_vel_body[1];
+  // gyroscope_data.Y() = -ang_vel_body[0];
+  // gyroscope_data.Z() = -ang_vel_body[2];
+
+  // ignition::math::Quaterniond quaternion1;
+  // geometry_msgs::msg::Quaternion quaternion2;
+
+  // quaternion1 = position.Rot();
+
+  // quaternion2.w = quaternion1.W();
+  // quaternion2.x = quaternion1.X();
+  // quaternion2.y = quaternion1.Y();
+  // quaternion2.z = quaternion1.Z();
+
+//   msg_->header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
+//     current_time);
+//   msg_->orientation = quaternion2;
+// //     gazebo_ros::Convert<geometry_msgs::msg::Quaternion>(quaternion2);
+    
+  // (void)accelerometer_data;
+  // (void)gyroscope_data;
+  // msg_->angular_velocity = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(ang_vel_body);
+  // msg_->linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(lin_acc_body);
+
+  // pub_->publish(*msg_);
+
+  // (void)msg_;
+
   imu_measurement.name[0]     = link->GetName();
   imu_measurement.name[1]     = link->GetName();
   imu_measurement.name[2]     = link->GetName();
-  imu_measurement.position[0] = ang_vel.X();
-  imu_measurement.position[1] = ang_vel.Y();
-  imu_measurement.position[2] = ang_vel.Z();
-  imu_measurement.velocity[0] = lin_acc.X();
-  imu_measurement.velocity[1] = lin_acc.Y();
-  imu_measurement.velocity[2] = lin_acc.Z();
+  imu_measurement.position[0] = ang_vel_body[0];
+  imu_measurement.position[1] = ang_vel_body[1];
+  imu_measurement.position[2] = ang_vel_body[2];
+  imu_measurement.velocity[0] = lin_acc_body[0];
+  imu_measurement.velocity[1] = lin_acc_body[1];
+  imu_measurement.velocity[2] = lin_acc_body[2];
   imu_measurement.effort[0]   = ang_acc.X();
   imu_measurement.effort[1]   = ang_acc.Y();
   imu_measurement.effort[2]   = ang_acc.Z();
@@ -379,7 +335,7 @@ void HTNavGazeboRosLinkStatePublisherPrivate::OnUpdate(const gazebo::common::Upd
   data_counter_ += 1;
 }
 
-void HTNavGazeboRosLinkStatePublisherPrivate::LinkStateSolver(sensor_msgs::msg::JointState *link_state, gazebo::physics::LinkPtr link)
+void HTNavGazeboRosLinkIMUPublisherPrivate::LinkStateSolver(sensor_msgs::msg::JointState *link_state, gazebo::physics::LinkPtr link)
 {
   link_state->name.resize(3);
   link_state->position.resize(3);
@@ -409,6 +365,32 @@ void HTNavGazeboRosLinkStatePublisherPrivate::LinkStateSolver(sensor_msgs::msg::
 
 }
 
+void HTNavGazeboRosLinkIMUPublisherPrivate::Euler2Cnb(double c_nb[3][3], double euler_in[3])
+{
+    c_nb[0][0] = cos(euler_in[1]) * cos(euler_in[2]);
+    c_nb[0][1] = cos(euler_in[1]) * sin(euler_in[2]);
+    c_nb[0][2] = -sin(euler_in[1]);
+    c_nb[1][0] = -cos(euler_in[0]) * sin(euler_in[2]) + sin(euler_in[0]) * sin(euler_in[1]) * cos(euler_in[2]);
+    c_nb[1][1] = cos(euler_in[0]) * cos(euler_in[2]) + sin(euler_in[0]) * sin(euler_in[1]) * sin(euler_in[2]);
+    c_nb[1][2] = sin(euler_in[0]) * cos(euler_in[1]);
+    c_nb[2][0] = sin(euler_in[0]) * sin(euler_in[2]) + cos(euler_in[0]) * sin(euler_in[1]) * cos(euler_in[2]);
+    c_nb[2][1] = -sin (euler_in[0]) * cos(euler_in[2]) + cos(euler_in[0]) * sin(euler_in[1]) * sin(euler_in[2]);
+    c_nb[2][2] = cos(euler_in[0]) * cos(euler_in[1]);
+}
 
-GZ_REGISTER_MODEL_PLUGIN(HTNavGazeboRosLinkStatePublisher)
+
+void HTNavGazeboRosLinkIMUPublisherPrivate::MatrixVectorMult(double vector_res[3], double matrix1[3][3], double vector2[3]) {
+	for (int i = 0; i < 3; i++)
+	{
+		vector_res[i] = 0;
+		for (int j = 0; j < 3; j++)
+		{
+			vector_res[i] = vector_res[i] + matrix1[i][j]*vector2[j];
+		}
+	}
+	return;
+}
+
+
+GZ_REGISTER_MODEL_PLUGIN(HTNavGazeboRosLinkIMUPublisher)
 }  // namespace gazebo_plugins

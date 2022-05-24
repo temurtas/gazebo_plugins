@@ -604,11 +604,11 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
 
   auto steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
   
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "FL Yaw vs Ref vs Diff vs Cmd [%lf] , [%lf], [%lf], [%lf]", left_steering_angle  , target_left_steering , (left_steering_diff*(57.29)), left_steering_cmd);
-  }  
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "FL Yaw vs Ref vs Diff vs Cmd [%lf] , [%lf], [%lf], [%lf]", left_steering_angle  , target_left_steering , (left_steering_diff*(57.29)), left_steering_cmd);
+  // }  
 
 
   // double fl_steer = joints_[STEER_LEFT]->Position(0);
