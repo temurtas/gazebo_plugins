@@ -58,6 +58,8 @@ public:
 
   /// Connects to pre-render events.
   gazebo::event::ConnectionPtr update_connection_;
+
+  int counter_ = 0;
 };
 
 GazeboRosBumper::GazeboRosBumper()
@@ -106,6 +108,7 @@ void GazeboRosBumper::Load(gazebo::sensors::SensorPtr _sensor, sdf::ElementPtr _
 
 void GazeboRosBumperPrivate::OnUpdate()
 {
+  counter_ = counter_ +1;
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE("GazeboRosBumperPrivate::OnUpdate");
   IGN_PROFILE_BEGIN("fill message");
@@ -121,6 +124,36 @@ void GazeboRosBumperPrivate::OnUpdate()
   IGN_PROFILE_BEGIN("publish");
 #endif
 
+  // if (counter_ % 100 == 0)
+  // {
+  //   RCLCPP_INFO(ros_node_->get_logger(), "Contacts Size [%d]", contacts.contact_size());
+  // }
+  
+
+for (int i = 0; i < contacts.contact_size(); ++i)
+  {
+    // std::cout << "Collision between[" << contacts.contact(i).collision1()
+    //           << "] and [" << contacts.contact(i).collision2() << "]\n";
+
+    // if (counter_ % 100 == 0)
+    // {
+    //   RCLCPP_INFO(ros_node_->get_logger(), "Pos Size [%d]", contacts.contact(i).position_size());
+    // }
+    for (int j = 0; j < contacts.contact(i).position_size(); ++j)
+    {
+    // RCLCPP_INFO(
+    // ros_node_->get_logger(), "Subscribed to [%s]", contacts.contact(i).position(j).x());
+      // std::cout << j << "  Position:"
+      //           << contacts.contact(i).position(j).x() << " "
+      //           << contacts.contact(i).position(j).y() << " "
+      //           << contacts.contact(i).position(j).z() << "\n";
+      // std::cout << "   Normal:"
+      //           << contacts.contact(i).normal(j).x() << " "
+      //           << contacts.contact(i).normal(j).y() << " "
+      //           << contacts.contact(i).normal(j).z() << "\n";
+      // std::cout << "   Depth:" << contacts.contact(i).depth(j) << "\n";
+    }
+  }
   pub_->publish(contact_state_msg);
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_END();

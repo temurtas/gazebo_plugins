@@ -228,6 +228,45 @@ if(ENABLE_PROFILER)
   target_link_libraries(gazebo_ros_camera ${ignition-common3_LIBRARIES})
 endif()
 
+# ht_nav_gazebo_ros_contact_sensor
+add_library(ht_nav_gazebo_ros_contact_sensor SHARED
+  src/ht_nav_gazebo_ros_contact_sensor.cpp
+)
+target_include_directories(ht_nav_gazebo_ros_contact_sensor PUBLIC include)
+ament_target_dependencies(ht_nav_gazebo_ros_contact_sensor
+  "gazebo_ros"
+  "gazebo_msgs"
+  "sensor_msgs"
+  "gazebo_dev"
+)
+target_link_libraries(ht_nav_gazebo_ros_contact_sensor
+  ContactPlugin
+)
+ament_export_libraries(ht_nav_gazebo_ros_contact_sensor)
+if(ENABLE_PROFILER)
+  target_include_directories(ht_nav_gazebo_ros_contact_sensor PUBLIC ${ignition-common3_INCLUDE_DIRS})
+  target_link_libraries(ht_nav_gazebo_ros_contact_sensor ${ignition-common3_LIBRARIES})
+endif()
+
+# ht_nav_gazebo_ros_contact_sensor
+# add_library(ht_nav_gazebo_ros_contact_sensor SHARED
+#   src/ht_nav_gazebo_ros_contact_sensor.cpp
+# )
+# target_include_directories(ht_nav_gazebo_ros_contact_sensor PUBLIC include)
+# ament_target_dependencies(ht_nav_gazebo_ros_contact_sensor
+#   "gazebo_ros"
+#   "sensor_msgs"
+#   "gazebo_dev"
+# )
+# target_link_libraries(ht_nav_gazebo_ros_contact_sensor
+#   ImuSensorPlugin
+# )
+# ament_export_libraries(ht_nav_gazebo_ros_contact_sensor)
+# if(ENABLE_PROFILER)
+#   target_include_directories(ht_nav_gazebo_ros_contact_sensor PUBLIC ${ignition-common3_INCLUDE_DIRS})
+#   target_link_libraries(ht_nav_gazebo_ros_contact_sensor ${ignition-common3_LIBRARIES})
+# endif()
+
 # gazebo_ros_imu_sensor
 add_library(gazebo_ros_imu_sensor SHARED
   src/gazebo_ros_imu_sensor.cpp

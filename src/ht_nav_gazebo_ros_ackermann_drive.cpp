@@ -24,6 +24,7 @@
 #include <gazebo_ros/conversions/geometry_msgs.hpp>
 #include <gazebo_ros/node.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+
 #ifdef IGN_PROFILER_ENABLE
 #include <ignition/common/Profiler.hh>
 #endif
@@ -109,10 +110,10 @@ public:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
 
   /// Odometry publisher
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_pub_;
+  // rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_pub_;
 
   /// Distance publisher
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr distance_pub_;
+  // rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr distance_pub_;
 
   /// Connection to event called at every world iteration.
   gazebo::event::ConnectionPtr update_connection_;
@@ -205,6 +206,7 @@ public:
 
   /// PID control for linear velocity control
   gazebo::common::PID pid_linear_vel_;
+
 };
 
 HTNavGazeboRosAckermannDrive::HTNavGazeboRosAckermannDrive()
@@ -387,30 +389,30 @@ void HTNavGazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::E
   impl_->robot_base_frame_ = _sdf->Get<std::string>("robot_base_frame", "base_footprint").first;
 
   // Advertise odometry topic
-  impl_->publish_odom_ = _sdf->Get<bool>("publish_odom", false).first;
-  if (impl_->publish_odom_) {
-    impl_->odometry_pub_ = impl_->ros_node_->create_publisher<nav_msgs::msg::Odometry>(
-      "odom", qos.get_publisher_qos("odom", rclcpp::QoS(1)));
+  // impl_->publish_odom_ = _sdf->Get<bool>("publish_odom", false).first;
+  // if (impl_->publish_odom_) {
+  //   impl_->odometry_pub_ = impl_->ros_node_->create_publisher<nav_msgs::msg::Odometry>(
+  //     "odom", qos.get_publisher_qos("odom", rclcpp::QoS(1)));
 
-    RCLCPP_INFO(
-      impl_->ros_node_->get_logger(), "Advertise odometry on [%s]",
-      impl_->odometry_pub_->get_topic_name());
-  }
+  //   RCLCPP_INFO(
+  //     impl_->ros_node_->get_logger(), "Advertise odometry on [%s]",
+  //     impl_->odometry_pub_->get_topic_name());
+  // }
 
-  // Advertise distance travelled
-  impl_->publish_distance_ = _sdf->Get<bool>("publish_distance", false).first;
-  if (impl_->publish_distance_) {
-    impl_->distance_pub_ = impl_->ros_node_->create_publisher<std_msgs::msg::Float32>(
-      "distance", qos.get_publisher_qos("distance", rclcpp::QoS(1)));
+  // // Advertise distance travelled
+  // impl_->publish_distance_ = _sdf->Get<bool>("publish_distance", false).first;
+  // if (impl_->publish_distance_) {
+  //   impl_->distance_pub_ = impl_->ros_node_->create_publisher<std_msgs::msg::Float32>(
+  //     "distance", qos.get_publisher_qos("distance", rclcpp::QoS(1)));
 
-    RCLCPP_INFO(
-      impl_->ros_node_->get_logger(), "Advertise distance on [%s]",
-      impl_->distance_pub_->get_topic_name());
-  }
+  //   RCLCPP_INFO(
+  //     impl_->ros_node_->get_logger(), "Advertise distance on [%s]",
+  //     impl_->distance_pub_->get_topic_name());
+  // }
 
-  // Create TF broadcaster if needed
-  impl_->publish_wheel_tf_ = _sdf->Get<bool>("publish_wheel_tf", false).first;
-  impl_->publish_odom_tf_ = _sdf->Get<bool>("publish_odom_tf", false).first;
+  // // Create TF broadcaster if needed
+  // impl_->publish_wheel_tf_ = _sdf->Get<bool>("publish_wheel_tf", false).first;
+  // impl_->publish_odom_tf_ = _sdf->Get<bool>("publish_odom_tf", false).first;
   if (impl_->publish_wheel_tf_ || impl_->publish_odom_tf_) {
     impl_->transform_broadcaster_ =
       std::make_shared<tf2_ros::TransformBroadcaster>(impl_->ros_node_);
@@ -468,7 +470,7 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   IGN_PROFILE_BEGIN("UpdateOdometryWorld");
 #endif
   // Update odom
-  UpdateOdometryWorld();
+  // UpdateOdometryWorld();
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_END();
 #endif
@@ -476,60 +478,60 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
     return;
   }
 
-  if (publish_distance_) {
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_BEGIN("publish distance");
-#endif
-    distance_pub_->publish(distance_);
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_END();
-#endif
-  }
+//   if (publish_distance_) {
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_BEGIN("publish distance");
+// #endif
+//     distance_pub_->publish(distance_);
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_END();
+// #endif
+//   }
 
-  if (publish_odom_) {
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_BEGIN("PublishOdometryMsg");
-#endif
-    PublishOdometryMsg(_info.simTime);
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_END();
-#endif
-  }
+//   if (publish_odom_) {
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_BEGIN("PublishOdometryMsg");
+// #endif
+//     PublishOdometryMsg(_info.simTime);
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_END();
+// #endif
+//   }
 
-  if (publish_wheel_tf_) {
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_BEGIN("PublishWheelsTf");
-#endif
-    PublishWheelsTf(_info.simTime);
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_END();
-#endif
-  }
+//   if (publish_wheel_tf_) {
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_BEGIN("PublishWheelsTf");
+// #endif
+//     PublishWheelsTf(_info.simTime);
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_END();
+// #endif
+//   }
 
-  if (publish_odom_tf_) {
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_BEGIN("PublishOdometryTf");
-#endif
-    PublishOdometryTf(_info.simTime);
-#ifdef IGN_PROFILER_ENABLE
-    IGN_PROFILE_END();
-#endif
-  }
+//   if (publish_odom_tf_) {
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_BEGIN("PublishOdometryTf");
+// #endif
+//     PublishOdometryTf(_info.simTime);
+// #ifdef IGN_PROFILER_ENABLE
+//     IGN_PROFILE_END();
+// #endif
+//   }
 
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_BEGIN("update");
 #endif
 
   /* Compute Linear Velocity Command */
-  linear_vel_.assign(6, 0.0);
-  target_linear_vel_.assign(6, 0.0);
-  linear_diff_.assign(6, 0.0);
-  linear_cmd_.assign(6, 0.0);
+  // linear_vel_.assign(6, 0.0);
+  // target_linear_vel_.assign(6, 0.0);
+  // linear_diff_.assign(6, 0.0);
+  // linear_cmd_.assign(6, 0.0);
     
-  linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
-  linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
+  // linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
+  // linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
 
-  std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
+  // std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
 
   // if (counter_%100 == 0){
   // RCLCPP_INFO(
@@ -537,26 +539,26 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   //       "Ackermann Target Vels [%lf] , [%lf]", ack_drive_velocities[REAR_LEFT] , ack_drive_velocities[REAR_RIGHT] );
   // }    
 
-  target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
-  target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
+  // target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
+  // target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
 
-  linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
-  linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+  // linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
+  // linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
 
-  linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
-  linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
+  // linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
+  // linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
 
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Lin vel vs Target Vel [%lf] , [%lf]", linear_vel_[REAR_LEFT] * wheel_radius_ , target_linear_vel_[REAR_LEFT] );
-  }    
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Lin vel vs Target Vel [%lf] , [%lf]", linear_vel_[REAR_LEFT] * wheel_radius_ , target_linear_vel_[REAR_LEFT] );
+  // }    
 
-  if (counter_%100 == 0){
-  RCLCPP_INFO(
-        ros_node_->get_logger(),
-        "Lin Diff vs Lin CMD [%lf] , [%lf]", linear_diff_[REAR_LEFT]  , linear_cmd_[REAR_LEFT] );
-  }   
+  // if (counter_%100 == 0){
+  // RCLCPP_INFO(
+  //       ros_node_->get_logger(),
+  //       "Lin Diff vs Lin CMD [%lf] , [%lf]", linear_diff_[REAR_LEFT]  , linear_cmd_[REAR_LEFT] );
+  // }   
 
   /* Compute Steering Angle Commands */
   // std::vector<double> target_rot;
@@ -586,7 +588,7 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
 
   // auto steer_wheel_angle = (steer_ang_curr[STEER_LEFT] + steer_ang_curr[STEER_RIGHT]) * 0.5 / steering_ratio_;
   
-  auto steer_wheel_angle = target_rot_ / steering_ratio_;
+  // auto steer_wheel_angle = target_rot_ / steering_ratio_;
   
   // // if (counter_%100 == 0){
   // // RCLCPP_INFO(
@@ -595,8 +597,19 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   // // }     
 
   // if ( fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 100){
-  //   joints_[STEER_LEFT]->SetPosition(0, target_rot[STEER_LEFT] );
-  //   joints_[STEER_RIGHT]->SetPosition(0, target_rot[STEER_RIGHT] );  
+
+  auto target_rot = target_rot_ ; // * copysign(1.0, target_linear_);
+  // target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
+
+  double tanSteer = tan(target_rot);
+
+  double target_left_steering = 
+    atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+  double target_right_steering = 
+    atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+
+    joints_[STEER_LEFT]->SetPosition(0, target_left_steering );
+    joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
   //   counter_ +=1;    
   // }
   // else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 100 ){
@@ -605,32 +618,32 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   // else{
   // joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
   // joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
-    counter_ +=1;
+    // counter_ +=1;
   // } 
 
   // joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
   // joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
-  double linear_cmd_left = linear_cmd_[REAR_LEFT];
-  double linear_cmd_right = linear_cmd_[REAR_RIGHT];
+  // double linear_cmd_left = linear_cmd_[REAR_LEFT];
+  // double linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
 
-  (void) linear_cmd_left;
-  (void) linear_cmd_right;
+  // (void) linear_cmd_left;
+  // (void) linear_cmd_right;
 
   // Current speed assuming equal for left rear and right rear
-  auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
-  auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
-  double linear_diff = linear_vel - target_linear / wheel_radius_;
-  double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
+  // auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
+  // auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
+  // double linear_diff = linear_vel - target_linear / wheel_radius_;
+  // double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
 
-  joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
-  joints_[REAR_LEFT]->SetForce(0, linear_cmd);
+  // joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
+  // joints_[REAR_LEFT]->SetForce(0, linear_cmd);
 
-  past_target_rot_ = target_rot_;
+  // past_target_rot_ = target_rot_;
 
-  if (joints_.size() == 7) {
-    joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
-  }
+  // if (joints_.size() == 7) {
+  //   joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
+  // }
 
   last_update_time_ = _info.simTime;
   #ifdef IGN_PROFILER_ENABLE
@@ -756,7 +769,7 @@ void HTNavGazeboRosAckermannDrivePrivate::PublishOdometryMsg(const gazebo::commo
   odom_.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(_current_time);
 
   // Publish
-  odometry_pub_->publish(odom_);
+  // odometry_pub_->publish(odom_);
 }
 GZ_REGISTER_MODEL_PLUGIN(HTNavGazeboRosAckermannDrive)
 }  // namespace gazebo_plugins

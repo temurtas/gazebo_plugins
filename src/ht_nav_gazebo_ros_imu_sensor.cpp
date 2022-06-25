@@ -352,7 +352,7 @@ void HTNavGazeboRosImuSensorPrivate::OnUpdate()
     acc_rw_[i] = GaussianKernel(0, acc_rw_coeff_);
     gyro_rw_[i] = GaussianKernel(0, gyro_rw_coeff_);
   }
-  
+
   // if (data_counter_ % 100 == 0)
   // {
   //   RCLCPP_INFO(

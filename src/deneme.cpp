@@ -46,7 +46,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <gazebo_plugins/ht_nav_config.hpp>
 
 #include <memory>
 #include <string>
@@ -68,13 +67,13 @@ public:
   /// A pointer to the GazeboROS node.
   gazebo_ros::Node::SharedPtr ros_node_;
 
+  // sensor_msgs::msg::Imu::SharedPtr msg_;
   // ignition::math::Vector3d accelerometer_data{0, 0, 0};
   // ignition::math::Vector3d gyroscope_data{0, 0, 0};
 
   /// Joint state publisher.
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr imu_meas_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_;
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr ideal_pub_;
+  // rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pub_;
 
   /// Joints being tracked.
   std::vector<gazebo::physics::LinkPtr> links_;
@@ -88,38 +87,6 @@ public:
   /// Pointer to the update event connection.
   gazebo::event::ConnectionPtr update_connection_;
 
-  double GaussianKernel(double mu, double sigma);
-
-  double gaussian_noise_ = 0.0;
-  double acc_bias_std_ = 0.0;
-  double gyro_drift_std_ = 0.0;
-  double acc_sf_std_ = 0.0;
-  double gyro_sf_std_ =0.0;
-  double acc_rw_std_ = 0.0;
-  double gyro_rw_std_ = 0.0;
-
-  double pub_freq_ = 0.0;
-  double delta_t_ = 0.0;
-
-  std::vector<double> acc_bias_ ;
-  std::vector<double> gyro_drift_ ;
-  std::vector<double> acc_sf_ ;
-  std::vector<double> gyro_sf_ ;
-  std::vector<double> acc_rw_ ;
-  std::vector<double> gyro_rw_ ;
-  double acc_rw_coeff_ = 0.0;
-  double gyro_rw_coeff_ = 0.0;
-
-
-  ignition::math::Vector3d accelerometer_data{0, 0, 0};
-  ignition::math::Vector3d gyroscope_data{0, 0, 0};
-
-  ignition::math::Vector3d accelerometer_data_err{0, 0, 0};
-  ignition::math::Vector3d gyroscope_data_err{0, 0, 0};
-
-  FILE *fptr;
-
-  int init_flag_ = 0;
   int data_counter_ = 0;
 
 };
@@ -155,100 +122,6 @@ void HTNavGazeboRosLinkIMUPublisher::Load(gazebo::physics::ModelPtr model, sdf::
     impl_->ros_node_.reset();
   }
 
-/* *************** NOISE Parameters**************************************************** */
-
-  if (sdf->HasElement("updateRateHZ"))
-  {
-    impl_->pub_freq_ =  sdf->Get<double>("updateRateHZ");
-    impl_->delta_t_ = 1 / impl_->pub_freq_;
-  }
-  else
-  {
-    impl_->pub_freq_ = 100.0;
-    impl_->delta_t_ = 1 / impl_->pub_freq_;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <updateRateHZ>, set to default: 100.0 ");
-  }
-
-  if (sdf->HasElement("gaussianNoise"))
-  {
-    impl_->gaussian_noise_ =  sdf->Get<double>("gaussianNoise");
-  }
-  else
-  {
-    impl_->gaussian_noise_ = 0.0;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <gaussianNoise>, set to default: 0.0 ");
-  }
-
-  if (sdf->HasElement("AccBiasStd"))
-  {
-    impl_->acc_bias_std_ =  sdf->Get<double>("AccBiasStd");
-  }
-  else
-  {
-    impl_->acc_bias_std_ = 0.0;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <AccBiasStd>, set to default: 0.0 ");
-  }
-
-  if (sdf->HasElement("GyroBiasStd"))
-  {
-    impl_->gyro_drift_std_ =  sdf->Get<double>("GyroBiasStd");
-  }
-  else
-  {
-    impl_->gyro_drift_std_ = 0.0;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <GyroBiasStd>, set to default: 0.0 ");
-  }
-
-  if (sdf->HasElement("AccSFStd"))
-  {
-    impl_->acc_sf_std_ =  sdf->Get<double>("AccSFStd");
-  }
-  else
-  {
-    impl_->acc_sf_std_ = 0.0;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <AccSFStd>, set to default: 0.0 ");
-  }
-
-  if (sdf->HasElement("GyroSFStd"))
-  {
-    impl_->gyro_sf_std_ =  sdf->Get<double>("GyroSFStd");
-  }
-  else
-  {
-    impl_->gyro_sf_std_ = 0.0;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <GyroBiasStd>, set to default: 0.0 ");
-  }
-
-  if (sdf->HasElement("AccRWStd"))
-  {
-    impl_->acc_rw_std_ =  sdf->Get<double>("AccRWStd");
-  }
-  else
-  {
-    impl_->acc_rw_std_ = 0.0;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <AccRWStd>, set to default: 0.0 ");
-  }
-
-  if (sdf->HasElement("GyroRWStd"))
-  {
-    impl_->gyro_rw_std_ =  sdf->Get<double>("GyroRWStd");
-  }
-  else
-  {
-    impl_->gyro_rw_std_ = 0.0;
-    RCLCPP_WARN_STREAM(impl_->ros_node_->get_logger(), "missing <GyroRWStd>, set to default: 0.0 ");
-  }
-
-  impl_->acc_bias_.assign(3, 0.0);
-  impl_->gyro_drift_.assign(3, 0.0);
-  impl_->acc_sf_.assign(3, 0.0);
-  impl_->gyro_sf_.assign(3, 0.0);
-  impl_->acc_rw_.assign(3, 0.0);
-  impl_->gyro_rw_.assign(3, 0.0);
-
-/* ********************************************************************************** */
-
-
   // Update rate
   double update_rate = 100.0;
   if (!sdf->HasElement("update_rate")) {
@@ -270,13 +143,9 @@ void HTNavGazeboRosLinkIMUPublisher::Load(gazebo::physics::ModelPtr model, sdf::
   impl_->imu_meas_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
     "imu_data_link_body", qos.get_publisher_qos("imu_data_link_body", rclcpp::QoS(1000)));
 
-  impl_->pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
-    "imu_data_body", qos.get_publisher_qos("imu_data_body", rclcpp::SensorDataQoS().best_effort()));
+  // impl_->pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
+    // "imu_data_body", qos.get_publisher_qos("imu_data_body", rclcpp::SensorDataQoS().best_effort()));
 
-  impl_->ideal_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
-    "imu_data_body_ideal", qos.get_publisher_qos("imu_data_body_ideal", rclcpp::SensorDataQoS().best_effort()));
-
- 
   // Callback on every iteration
   impl_->update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
     std::bind(&HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
@@ -284,54 +153,7 @@ void HTNavGazeboRosLinkIMUPublisher::Load(gazebo::physics::ModelPtr model, sdf::
 
 void HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate(const gazebo::common::UpdateInfo & info)
 {
-  int i = 0;
-
-  if (init_flag_ == 0)
-  {
-
-    fptr = fopen(base_path"imu_link_data_errors_added.txt", "w");
-    if (fptr == NULL)
-    {
-      RCLCPP_ERROR(ros_node_->get_logger(), "Could not open file !");
-      return;
-    }
-
-    for (i = 0; i < 3; i++)
-    {
-    acc_bias_[i] = GaussianKernel(0, acc_bias_std_) * 9.81 * 1e-3;              // mg --> m/s^2
-    gyro_drift_[i] = GaussianKernel(0, gyro_drift_std_) / 57.295779 / 3600.0;   // deg/hr --> rad/s
-    acc_sf_[i] = GaussianKernel(0, acc_sf_std_) * 1e-6;                         // ppm -> unitless
-    gyro_sf_[i] = GaussianKernel(0, gyro_sf_std_) * 1e-6;                       // ppm -> unitless
-    }   
-
-
-    for (i = 0; i < 3; i++){
-      fprintf(fptr,"%lf\t", acc_bias_[i] / 9.81 *1e3 ); // m/s^2 --> mg
-    }
-    for (i = 0; i < 3; i++){
-      fprintf(fptr,"%lf\t", gyro_drift_[i] * 57.295779 * 3600.0 ); // rad/s --> deg/hr 
-    }
-    for (i = 0; i < 3; i++){
-      fprintf(fptr,"%lf\t", acc_sf_[i] *1e6 );     // unitless --> ppm
-    }
-    for (i = 0; i < 3; i++){
-      fprintf(fptr,"%lf\t", gyro_sf_[i] *1e6 );    // unitless --> ppm
-    }
-
-    fprintf(fptr,"\n");
-
-    acc_rw_coeff_ = GaussianKernel(0, acc_rw_std_) * 0.3048 / 60.0 * sqrt(delta_t_) ; // ft/s/rt-hr --> m/s^2  
-    gyro_rw_coeff_ = GaussianKernel(0, gyro_rw_std_) / 57.295779 / 3600.0 / 60.0 * sqrt(delta_t_); // deg/rt-hr --> rad/s
-
-    init_flag_ = 1;
-  }
-
-  for (i = 0; i < 3; i++)
-  {
-    acc_rw_[i] = GaussianKernel(0, acc_rw_coeff_);
-    gyro_rw_[i] = GaussianKernel(0, gyro_rw_coeff_);
-  }
-  
+  // int i = 0;
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE("HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate");
 #endif
@@ -397,7 +219,6 @@ void HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate(const gazebo::common::Updat
   double C_nb[3][3], euler_in[3];
   double lin_acc_ref[3], ang_vel_ref[3];
   double lin_acc_body[3], ang_vel_body[3];
-  double lin_acc_err[3], ang_vel_err[3];
 
   euler_in[0] = -link_state.effort[1]; 
   euler_in[1] = -link_state.effort[0]; 
@@ -415,17 +236,6 @@ void HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate(const gazebo::common::Updat
   MatrixVectorMult(ang_vel_body, C_nb, ang_vel_ref);
   MatrixVectorMult(lin_acc_body, C_nb, lin_acc_ref);
 
-  // Create the IMU message package 
-  sensor_msgs::msg::Imu msg;
-  sensor_msgs::msg::Imu ideal_msg;
-
-  // Tag IMU messages with time stamp of Gazebo Sim Time
-  msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
-    current_time);
-
-  ideal_msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
-    current_time);
-
   // Fill message with latest sensor data
 
   // accelerometer_data.X() = -lin_acc_body[1];
@@ -436,59 +246,30 @@ void HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate(const gazebo::common::Updat
   // gyroscope_data.Y() = -ang_vel_body[0];
   // gyroscope_data.Z() = -ang_vel_body[2];
 
+  // ignition::math::Quaterniond quaternion1;
   // geometry_msgs::msg::Quaternion quaternion2;
+
+  // quaternion1 = position.Rot();
+
   // quaternion2.w = quaternion1.W();
   // quaternion2.x = quaternion1.X();
   // quaternion2.y = quaternion1.Y();
   // quaternion2.z = quaternion1.Z();
 
-  // msg_->orientation = gazebo_ros::Convert<geometry_msgs::msg::Quaternion>(quaternion2);
-  // msg.angular_velocity    = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(accelerometer_data);
-  // msg.linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(gyroscope_data);
+//   msg_->header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
+//     current_time);
+//   msg_->orientation = quaternion2;
+// //     gazebo_ros::Convert<geometry_msgs::msg::Quaternion>(quaternion2);
+    
+  // (void)accelerometer_data;
+  // (void)gyroscope_data;
+  // msg_->angular_velocity = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(ang_vel_body);
+  // msg_->linear_acceleration = gazebo_ros::Convert<geometry_msgs::msg::Vector3>(lin_acc_body);
 
+  // pub_->publish(*msg_);
 
-  ignition::math::Quaterniond quaternion1;
-  quaternion1 = position.Rot();
+  // (void)msg_;
 
-  for (i = 0; i < 3; i++)
-  {
-    lin_acc_err[i]  = lin_acc_body[i]  + acc_sf_[i]  * lin_acc_body[i]  +  acc_bias_[i]   + acc_rw_[i];
-    ang_vel_err[i] = ang_vel_body[i] + gyro_sf_[i] * ang_vel_body[i] +  gyro_drift_[i] + gyro_rw_[i];
-  }
-
-  // Fill IMU message 
-  msg.linear_acceleration.x = -lin_acc_err[1];
-  msg.linear_acceleration.y = -lin_acc_err[0];
-  msg.linear_acceleration.z = -lin_acc_err[2];
-
-  msg.angular_velocity.x = -ang_vel_err[1];
-  msg.angular_velocity.y = -ang_vel_err[0];
-  msg.angular_velocity.z = -ang_vel_err[2];
-
-  msg.orientation.w = quaternion1.W();
-  msg.orientation.x = quaternion1.X();
-  msg.orientation.y = quaternion1.Y();
-  msg.orientation.z = quaternion1.Z();
-
-  // Fill Ideal IMU message 
-  ideal_msg.linear_acceleration.x = -lin_acc_body[1];
-  ideal_msg.linear_acceleration.y = -lin_acc_body[0];
-  ideal_msg.linear_acceleration.z = -lin_acc_body[2];
-  // Convert to Gazebo-World Body Frame
-  ideal_msg.angular_velocity.x = -ang_vel_body[1];
-  ideal_msg.angular_velocity.y = -ang_vel_body[0];
-  ideal_msg.angular_velocity.z = -ang_vel_body[2];
-
-  ideal_msg.orientation.w = quaternion1.W();
-  ideal_msg.orientation.x = quaternion1.X();
-  ideal_msg.orientation.y = quaternion1.Y();
-  ideal_msg.orientation.z = quaternion1.Z();
-
-  // Publish IMU Message
-  pub_->publish(msg);
-  ideal_pub_->publish(ideal_msg);
-
-  // Fill IMU Link IMU Data (Old Method)
   imu_measurement.name[0]     = link->GetName();
   imu_measurement.name[1]     = link->GetName();
   imu_measurement.name[2]     = link->GetName();
@@ -501,9 +282,44 @@ void HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate(const gazebo::common::Updat
   imu_measurement.effort[0]   = ang_acc.X();
   imu_measurement.effort[1]   = ang_acc.Y();
   imu_measurement.effort[2]   = ang_acc.Z();
-
+  
   imu_meas_pub_->publish(imu_measurement);
 
+  // velocity = link->WorldLinearVel();        
+  // position = link->WorldCoGPose();
+  // quaternion = position.Rot();
+  // euler[0] = quaternion.Roll();
+  // euler[1] = quaternion.Pitch();
+  // euler[2] = quaternion.Yaw();
+  
+  // link_state.name[0] = link->GetName();
+  // link_state.name[1] = link->GetName();
+  // link_state.name[2] = link->GetName();
+  // link_state.position[0] = position.X();
+  // link_state.position[1] = position.Y();
+  // link_state.position[2] = position.Z();
+  // link_state.velocity[0] = velocity.X();
+  // link_state.velocity[1] = velocity.Y();
+  // link_state.velocity[2] = velocity.Z();
+  // link_state.effort[0] =  quaternion.Roll();
+  // link_state.effort[1] =  quaternion.Pitch();
+  // link_state.effort[2] =  quaternion.Yaw();
+
+  // front_right_wheel_state_pub_;
+  // front_left_wheel_state_pub_;
+  // rear_right_wheel_state_pub_;
+  // rear_left_wheel_state_pub_;
+  // imu_link_state_pub_;
+
+  // // Publish
+  // publishers[0]->publish(link_state);
+
+  // if (data_counter_ % 100 == 0)
+  // {
+  // double yaw = link_state.effort[2] * 180.0 / 3.14;
+  // RCLCPP_INFO(
+  //   ros_node_->get_logger(), "Yaw Angle [%f]", yaw );
+  // }
 
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_END();
@@ -573,29 +389,6 @@ void HTNavGazeboRosLinkIMUPublisherPrivate::MatrixVectorMult(double vector_res[3
 		}
 	}
 	return;
-}
-
-
-//////////////////////////////////////////////////////////////////////////////
-// Utility for adding noise
-double HTNavGazeboRosLinkIMUPublisherPrivate::GaussianKernel(double mu, double sigma)
-{
-  // using Box-Muller transform to generate two independent standard
-  // normally disbributed normal variables see wikipedia
-
-  // normalized uniform random variable
-  double U = ignition::math::Rand::DblUniform();
-
-  // normalized uniform random variable
-  double V = ignition::math::Rand::DblUniform();
-
-  double X = sqrt(-2.0 * ::log(U)) * cos(2.0*M_PI * V);
-  // double Y = sqrt(-2.0 * ::log(U)) * sin(2.0*M_PI * V);
-
-  // there are 2 indep. vars, we'll just use X
-  // scale to our mu and sigma
-  X = sigma * X + mu;
-  return X;
 }
 
 

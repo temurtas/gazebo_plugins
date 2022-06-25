@@ -24,6 +24,8 @@
 #include <gazebo_ros/conversions/geometry_msgs.hpp>
 #include <gazebo_ros/node.hpp>
 #include <geometry_msgs/msg/twist.hpp>
+#include <gazebo_plugins/ht_nav_config.hpp>
+
 #ifdef IGN_PROFILER_ENABLE
 #include <ignition/common/Profiler.hh>
 #endif
@@ -204,6 +206,11 @@ public:
 
   /// PID control for linear velocity control
   gazebo::common::PID pid_linear_vel_;
+
+
+  FILE *fptr;
+
+  int init_flag_ = 0;
 };
 
 GazeboRosNewAckermannDrive::GazeboRosNewAckermannDrive()
@@ -461,6 +468,20 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
   #endif
   std::lock_guard<std::mutex> lock(lock_);
 
+  // if (init_flag_ == 0)
+  // {
+  //   fptr = fopen(base_path"ackermann_time.txt", "w");
+  //   double time = _info.simTime.Double() * 1e6;
+  //   fprintf(fptr,"%lf\t",  time );    // usec
+  //   fprintf(fptr,"\n");
+
+  //   init_flag_ = 1;
+  // }
+
+  // double time = _info.simTime.Double() * 1e6;
+  // fprintf(fptr,"%lf\t",  time );    // usec
+  // fprintf(fptr,"\n");
+  
   double seconds_since_last_update = (_info.simTime - last_update_time_).Double();
 
 #ifdef IGN_PROFILER_ENABLE
@@ -573,10 +594,8 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
   //       "Lin CMD New vs Old [%lf] , [%lf]", linear_cmd_[REAR_LEFT]  , linear_cmd );
   // }   
 
-  auto target_rot = target_rot_ ; // * copysign(1.0, target_linear_);
   // target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
 
-  double tanSteer = tan(target_rot);
 
   // Orijinal one
   // auto target_left_steering =
@@ -584,12 +603,26 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
   // auto target_right_steering =
     // atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
 
+  auto target_rot = target_rot_ ; // * copysign(1.0, target_linear_);
+  double tanSteer = tan(target_rot);
+
   (void) tanSteer;
   double target_left_steering = 
     atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
   double target_right_steering = 
     atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
 
+  // joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
+  // joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
+
+  // double fl_lin_vel = linear_vel_[REAR_LEFT]; // * cos(target_left_steering);
+  // double fr_lin_vel = linear_vel_[REAR_RIGHT]; // * cos(target_right_steering);
+
+  // // if (counter_%20 == 0){
+  // joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
+  // joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
+
+  // ******************************************
 
   auto left_steering_angle = joints_[STEER_LEFT]->Position(0);
   auto right_steering_angle = joints_[STEER_RIGHT]->Position(0);
@@ -663,24 +696,12 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
   // }     
 
 
-
-  joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
-  joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
-
-  double fl_lin_vel = linear_vel_[REAR_LEFT]; // * cos(target_left_steering);
-  double fr_lin_vel = linear_vel_[REAR_RIGHT]; // * cos(target_right_steering);
-
-  // if (counter_%20 == 0){
-    joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
-    joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
-
-  // joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-  // joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+  joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+  joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
 
     // joints_[STEER_RIGHT]->SetVelocity(1, linear_vel_[REAR_RIGHT] );
 
   // }
-
   (void)right_steering_cmd;
   (void)left_steering_cmd;
 
