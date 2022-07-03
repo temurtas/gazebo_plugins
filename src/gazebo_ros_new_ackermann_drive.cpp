@@ -467,21 +467,6 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
   IGN_PROFILE("GazeboRosNewAckermannDrivePrivate::OnUpdate");
   #endif
   std::lock_guard<std::mutex> lock(lock_);
-
-  // if (init_flag_ == 0)
-  // {
-  //   fptr = fopen(base_path"ackermann_time.txt", "w");
-  //   double time = _info.simTime.Double() * 1e6;
-  //   fprintf(fptr,"%lf\t",  time );    // usec
-  //   fprintf(fptr,"\n");
-
-  //   init_flag_ = 1;
-  // }
-
-  // double time = _info.simTime.Double() * 1e6;
-  // fprintf(fptr,"%lf\t",  time );    // usec
-  // fprintf(fptr,"\n");
-  
   double seconds_since_last_update = (_info.simTime - last_update_time_).Double();
 
 #ifdef IGN_PROFILER_ENABLE
@@ -539,204 +524,352 @@ void GazeboRosNewAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInf
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_BEGIN("update");
 #endif
-  // Current speed assuming equal for left rear and right rear
-  auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
-  auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
-  double linear_diff = linear_vel - target_linear / wheel_radius_;
-  double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
-  /* Compute Linear Velocity Command */
-  linear_vel_.assign(6, 0.0);
-  target_linear_vel_.assign(6, 0.0);
-  linear_diff_.assign(6, 0.0);
-  linear_cmd_.assign(6, 0.0);
+
+/* ******************************************************* */
+/* ******************************************************* */
+/* **************** Allocate the variables *************** */
+/* ******************************************************* */
+/* ******************************************************* */
+double linear_vel = 0.0;
+double target_linear = 0.0;
+double linear_diff = 0.0;
+double linear_cmd = 0.0;
+
+std::vector<double> ack_drive_velocities;
+std::vector<double> ack_steer_angles;
+
+double target_rot = 0.0;
+double tanSteer = 0.0;
+double target_left_steering   = 0.0;
+double target_right_steering  = 0.0;
+double left_steering_angle = 0.0;
+double right_steering_angle = 0.0;
+double left_steering_diff = 0.0;
+double right_steering_diff = 0.0;
+double left_steering_cmd = 0.0;
+double right_steering_cmd = 0.0;
+double steer_wheel_angle = 0.0;
+
+std::vector<double> target_rot_6;
+std::vector<double> steer_ang_curr;
+std::vector<double> steer_error;
+std::vector<double> steer_cmd_effort;
+
+target_rot_6.assign(6, 0.0);
+steer_ang_curr.assign(6, 0.0);
+steer_error.assign(6, 0.0);
+steer_cmd_effort.assign(6, 0.0);
+
+double linear_cmd_left  = 0.0;
+double linear_cmd_right = 0.0;
+double fl_lin_vel = 0.0;
+double fr_lin_vel = 0.0;
+double target_linear_vel_right = 0.0;
+double target_linear_vel_left  = 0.0;
+
+// switch (method) {
+//   case 1:
+
+//   case 2:
+
+//   default:
+
+// }
+
+// method # 1: Original Ackermann Plug-in 
+// method # 2: Modified Ackermann Plug-in w/seperated joint comments for right and left wheels
+// method # 3: Constant Steering Angle with  
+
+int method = 5;
+
+switch (method) {
+  case 1: {
+/* ******************************************************* */
+/* ************ METHOD #1 : ORIGINAL PLUG-IN  ************ */
+/* ******************************************************* */
+    /* Current speed assuming equal for left rear and right rear */
+    linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
+    target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
+    linear_diff = linear_vel - target_linear / wheel_radius_;
+    linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
+
+    /* Calculate the target steering angle using ackermann geometry */
+    target_rot = target_rot_ * copysign(1.0, target_linear_);
+    target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
+    tanSteer = tan(target_rot);   
+    target_left_steering  = atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    target_right_steering = atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    /* Calculate the error variable */
+    left_steering_angle  = joints_[STEER_LEFT]->Position(0);
+    right_steering_angle = joints_[STEER_RIGHT]->Position(0);
+
+    left_steering_diff  = left_steering_angle - target_left_steering;
+    right_steering_diff = right_steering_angle - target_right_steering;
+    /* Calculate the command */
+    left_steering_cmd  = pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
+    right_steering_cmd = pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
+    /* Calculate the Steering Wheel Angle */
+    steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
+
+    /* Set calculated command torques to rear wheel joints*/
+    joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
+    joints_[REAR_LEFT]->SetForce(0, linear_cmd);
+    /* Set calculated command torques to front wheel joints*/
+    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
+    break;
+  }
+  case 2: {
+/* **************************************************************** */
+/* ***************** METHOD #2 : Modified Plugin  ***************** */
+/* ****** w/seperated joint comments for right and left wheels **** */
+/* **************************************************************** */
+    /* Compute Linear Velocity Command For Rear Wheels without assuming equal speeds */
+    linear_vel_.assign(6, 0.0);
+    target_linear_vel_.assign(6, 0.0);
+    linear_diff_.assign(6, 0.0);
+    linear_cmd_.assign(6, 0.0);
+      
+    /* Store Linear Velocities of two rear wheels */
+    linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
+    linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
+
+    ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
+
+    target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
+    target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
+
+    linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
+    linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
+
+    linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+    linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
+
+    /* Calculate the target steering angle using ackermann geometry */
+    target_rot = target_rot_ ; 
+    tanSteer = tan(target_rot);
+    target_left_steering  = atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    target_right_steering = atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    /* Calculate the error variable */
+    left_steering_angle = joints_[STEER_LEFT]->Position(0);
+    right_steering_angle = joints_[STEER_RIGHT]->Position(0);
+
+    left_steering_diff = left_steering_angle - target_left_steering;
+    right_steering_diff = right_steering_angle - target_right_steering;
+    /* Calculate the command */
+    left_steering_cmd = pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
+    right_steering_cmd = pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
+    /* Calculate the Steering Wheel Angle */
+    steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
+
+    /* Set calculated command torques to rear wheel joints*/
+    linear_cmd_left  = linear_cmd_[REAR_LEFT];
+    linear_cmd_right = linear_cmd_[REAR_RIGHT];
+
+    joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
+    joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+    /* Set calculated command torques to front wheel joints*/    
+    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    break;
+  }
+  case 3: {
+/* **************************************************************** */
+/* ***************** METHOD #2 : Modified Plugin  ***************** */
+/* ****** w/seperated joint comments for right and left wheels **** */
+/* **************************************************************** */
+    /* Compute Linear Velocity Command For Rear Wheels without assuming equal speeds */
+    linear_vel_.assign(6, 0.0);
+    target_linear_vel_.assign(6, 0.0);
+    linear_diff_.assign(6, 0.0);
+    linear_cmd_.assign(6, 0.0);
+      
+    /* Store Linear Velocities of two rear wheels */
+    linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
+    linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
+
+    ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
+
+    target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
+    target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
+
+    linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
+    linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
+
+    linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+    linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
+
+    /* Calculate the target steering angle using ackermann geometry */
+    ack_steer_angles = GetAckAngles(target_rot_); 
+    target_rot_6[STEER_LEFT] = ignition::math::clamp(ack_steer_angles[STEER_LEFT], -max_steer_, max_steer_);
+    target_rot_6[STEER_RIGHT] = ignition::math::clamp(ack_steer_angles[STEER_RIGHT], -max_steer_, max_steer_);
+    /* Calculate the error variable */
+    steer_ang_curr[STEER_LEFT] = joints_[STEER_LEFT]->Position(0);
+    steer_ang_curr[STEER_RIGHT] = joints_[STEER_RIGHT]->Position(0);
     
-  linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
-  linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
+    steer_error[STEER_RIGHT] = steer_ang_curr[STEER_RIGHT] - target_rot_6[STEER_RIGHT];
+    steer_error[STEER_LEFT] = steer_ang_curr[STEER_LEFT] - target_rot_6[STEER_LEFT];
+    /* Calculate the command */
+    steer_cmd_effort[STEER_LEFT] = pid_left_steering_.Update(steer_error[STEER_LEFT], seconds_since_last_update);
+    steer_cmd_effort[STEER_RIGHT] = pid_left_steering_.Update(steer_error[STEER_RIGHT], seconds_since_last_update);
+    /* Calculate the Steering Wheel Angle */
+    steer_wheel_angle = (steer_ang_curr[STEER_LEFT] + steer_ang_curr[STEER_RIGHT]) * 0.5 / steering_ratio_;
 
-  std::vector<double> ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
+    /* Set calculated command torques to rear wheel joints*/
+    linear_cmd_left  = linear_cmd_[REAR_LEFT];
+    linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Ackermann Target Vels [%lf] , [%lf]", ack_drive_velocities[REAR_LEFT] , ack_drive_velocities[REAR_RIGHT] );
-  // }    
+    joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
+    joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+    /* Set calculated command torques to front wheel joints*/
+    left_steering_cmd  = steer_cmd_effort[STEER_LEFT];
+    right_steering_cmd = steer_cmd_effort[STEER_RIGHT];
 
-  target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
-  target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
+    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    break;
+  }
+  case 4: {
+/* **************************************************************** */
+/* ***************** METHOD #2 : Modified Plugin  ***************** */
+/* ****** w/seperated joint comments for right and left wheels **** */
+/* **************************************************************** */
+    /* Compute Linear Velocity Command For Rear Wheels without assuming equal speeds */
+    linear_vel_.assign(6, 0.0);
+    target_linear_vel_.assign(6, 0.0);
+    linear_diff_.assign(6, 0.0);
+    linear_cmd_.assign(6, 0.0);
+      
+    /* Store Linear Velocities of two rear wheels */
+    linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
+    linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
 
-  linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
-  linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+    ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
 
-  linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
-  linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
+    target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
+    target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
 
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Lin vel Old vs New [%lf] , [%lf]", linear_vel_[REAR_LEFT] * wheel_radius_ , linear_vel * wheel_radius_);
-  // }    
+    linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
+    linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
 
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Target vel Old vs New [%lf] , [%lf]", target_linear_vel_[REAR_LEFT] , target_linear );
-  // }    
+    linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+    linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
 
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Lin Diff New vs Old [%lf] , [%lf]", linear_diff_[REAR_LEFT]  , linear_diff );
-  // }   
+    /* Calculate the target steering angle using ackermann geometry */
+    target_rot = target_rot_ ; // * copysign(1.0, target_linear_);
+    tanSteer = tan(target_rot);
+    target_left_steering  = atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    target_right_steering = atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    /* Calculate the Steering Wheel Angle */
+    steer_wheel_angle = target_rot / steering_ratio_;
 
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Lin CMD New vs Old [%lf] , [%lf]", linear_cmd_[REAR_LEFT]  , linear_cmd );
-  // }   
+/* Set calculated command torques to rear wheel joints*/
+    linear_cmd_left  = linear_cmd_[REAR_LEFT];
+    linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
-  // target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
+    joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
+    joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+    /* Set front steering angles to ideal target steering angle */
+    joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
+    joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
+    /* Set front wheel velocities as rear ones, setting exact position locks the wheel! */
+    fl_lin_vel = linear_vel_[REAR_LEFT];
+    fr_lin_vel = linear_vel_[REAR_RIGHT]; 
+     
+    joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
+    joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
+    break;
+  }
+  case 5: {
+/* **************************************************************** */
+/* ***************** METHOD #2 : Modified Plugin  ***************** */
+/* ****** w/seperated joint comments for right and left wheels **** */
+/* **************************************************************** */
+    /* Compute Linear Velocity Command For Rear Wheels without assuming equal speeds */
+    linear_vel_.assign(6, 0.0);
+    target_linear_vel_.assign(6, 0.0);
+    linear_diff_.assign(6, 0.0);
+    linear_cmd_.assign(6, 0.0);
+      
+    /* Store Linear Velocities of two rear wheels */
+    linear_vel_[REAR_LEFT] = joints_[REAR_LEFT]->GetVelocity(0);
+    linear_vel_[REAR_RIGHT] = joints_[REAR_RIGHT]->GetVelocity(0);
 
+    ack_drive_velocities = GetDiffSpeeds(target_linear_, target_rot_);
 
-  // Orijinal one
-  // auto target_left_steering =
-    // atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
-  // auto target_right_steering =
-    // atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
+    target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
 
-  auto target_rot = target_rot_ ; // * copysign(1.0, target_linear_);
-  double tanSteer = tan(target_rot);
+    /* Calculate the target steering angle using ackermann geometry */
+    target_rot = target_rot_ ; 
+    tanSteer = tan(target_rot);
+    target_left_steering  = atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    target_right_steering = atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    /* Calculate the error variable */
+    left_steering_angle = joints_[STEER_LEFT]->Position(0);
+    right_steering_angle = joints_[STEER_RIGHT]->Position(0);
 
-  (void) tanSteer;
-  double target_left_steering = 
-    atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
-  double target_right_steering = 
-    atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    left_steering_diff = left_steering_angle - target_left_steering;
+    right_steering_diff = right_steering_angle - target_right_steering;
+    /* Calculate the command */
+    left_steering_cmd = pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
+    right_steering_cmd = pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
+    /* Calculate the Steering Wheel Angle */
+    steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
 
-  // joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
-  // joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
+    /* Set rear wheel velocities to ideal target linear velocity */
+    target_linear_vel_right = target_linear_vel_[REAR_RIGHT];
+    target_linear_vel_left  = target_linear_vel_[REAR_LEFT];
 
-  // double fl_lin_vel = linear_vel_[REAR_LEFT]; // * cos(target_left_steering);
-  // double fr_lin_vel = linear_vel_[REAR_RIGHT]; // * cos(target_right_steering);
+    joints_[REAR_RIGHT]->SetVelocity(1,  target_linear_vel_right);
+    joints_[REAR_LEFT]->SetVelocity(1, target_linear_vel_left);
+    /* Set calculated command torques to front wheel joints*/
+    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    break;
+  }
+  default: {
+/* ******************************************************* */
+/* ************ METHOD #1 : ORIGINAL PLUG-IN  ************ */
+/* ******************************************************* */
+    /* Current speed assuming equal for left rear and right rear */
+    linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
+    target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
+    linear_diff = linear_vel - target_linear / wheel_radius_;
+    linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
 
-  // // if (counter_%20 == 0){
-  // joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
-  // joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
+    /* Calculate the target steering angle using ackermann geometry */
+    target_rot = target_rot_ * copysign(1.0, target_linear_);
+    target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
+    tanSteer = tan(target_rot);   
+    target_left_steering  = atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    target_right_steering = atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+    /* Calculate the error variable */
+    left_steering_angle  = joints_[STEER_LEFT]->Position(0);
+    right_steering_angle = joints_[STEER_RIGHT]->Position(0);
 
-  // ******************************************
+    left_steering_diff  = left_steering_angle - target_left_steering;
+    right_steering_diff = right_steering_angle - target_right_steering;
+    /* Calculate the command */
+    left_steering_cmd  = pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
+    right_steering_cmd = pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
+    /* Calculate the Steering Wheel Angle */
+    steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
 
-  auto left_steering_angle = joints_[STEER_LEFT]->Position(0);
-  auto right_steering_angle = joints_[STEER_RIGHT]->Position(0);
+    /* Set calculated command torques to rear wheel joints*/
+    joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
+    joints_[REAR_LEFT]->SetForce(0, linear_cmd);
+    /* Set calculated command torques to front wheel joints*/
+    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
+    break;
+  }
+}
 
-  double left_steering_diff = left_steering_angle - target_left_steering;
-  double left_steering_cmd =
-    pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
-
-  double right_steering_diff = right_steering_angle - target_right_steering;
-  double right_steering_cmd =
-    pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
-
-  auto steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
+/* ****************** Increase the Counter  ************* */
+  counter_ +=1;
   
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "FL Yaw vs Ref vs Diff vs Cmd [%lf] , [%lf], [%lf], [%lf]", left_steering_angle  , target_left_steering , (left_steering_diff*(57.29)), left_steering_cmd);
-  // }  
-
-
-  // double fl_steer = joints_[STEER_LEFT]->Position(0);
-  // double fr_steer = joints_[STEER_RIGHT]->Position(0);
-
-  // double rl_steer = joints_[REAR_LEFT]->GetAngle(0);
-  // double rr_steer = joints_[REAR_RIGHT]->GetAngle(1);
-
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Steer Angles FL:[%lf], FR,[%lf], RL:[%lf], RR:[%lf]", fl_steer  , fr_steer , rl_steer, rr_steer);
-  // }  
-  
-  /* Compute Steering Angle Commands */
-  std::vector<double> target_rot_6;
-  target_rot_6.assign(6, 0.0);
-
-  std::vector<double> steer_ang_curr;
-  steer_ang_curr.assign(6, 0.0);
-
-  std::vector<double> steer_error;
-  steer_error.assign(6, 0.0);
-
-  std::vector<double> steer_cmd_effort;
-  steer_cmd_effort.assign(6, 0.0);
-
-  std::vector<double> ack_steer_angles = GetAckAngles(target_rot_); 
-
-  target_rot_6[STEER_LEFT] = ignition::math::clamp(ack_steer_angles[STEER_LEFT], -max_steer_, max_steer_);
-  target_rot_6[STEER_RIGHT] = ignition::math::clamp(ack_steer_angles[STEER_RIGHT], -max_steer_, max_steer_);
-
-  steer_ang_curr[STEER_LEFT] = joints_[STEER_LEFT]->Position(0);
-  steer_error[STEER_LEFT] = steer_ang_curr[STEER_LEFT] - target_rot_6[STEER_LEFT];
-  steer_cmd_effort[STEER_LEFT] = pid_left_steering_.Update(steer_error[STEER_LEFT], seconds_since_last_update);
-
-  steer_ang_curr[STEER_RIGHT] = joints_[STEER_RIGHT]->Position(0);
-  steer_error[STEER_RIGHT] = steer_ang_curr[STEER_RIGHT] - target_rot_6[STEER_RIGHT];
-  steer_cmd_effort[STEER_RIGHT] = pid_left_steering_.Update(steer_error[STEER_RIGHT], seconds_since_last_update);
-
-  // auto steer_wheel_angle = (steer_ang_curr[STEER_LEFT] + steer_ang_curr[STEER_RIGHT]) * 0.5 / steering_ratio_;
-  
-  // auto steer_wheel_angle = target_rot_ / steering_ratio_;
-  
-  // if (counter_%100 == 0){
-  // RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Right Steering CMD [%lf] , [%lf]", right_steering_cmd ,  steer_cmd_effort[STEER_RIGHT]  );
-  //       RCLCPP_INFO(
-  //       ros_node_->get_logger(),
-  //       "Left Steering CMD [%lf] , [%lf]", left_steering_cmd ,  steer_cmd_effort[STEER_LEFT]  );
-  // }     
-
-
-  joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-  joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
-
-    // joints_[STEER_RIGHT]->SetVelocity(1, linear_vel_[REAR_RIGHT] );
-
-  // }
-  (void)right_steering_cmd;
-  (void)left_steering_cmd;
-
-  // if ( target_linear_ < 1e-6 && fabs(past_target_rot_ - target_rot_) < 1e-5 && counter_ > 25){
-  //   joints_[STEER_LEFT]->SetPosition(0, target_rot_6[STEER_LEFT] );
-  //   joints_[STEER_RIGHT]->SetPosition(0, target_rot_6[STEER_RIGHT] );  
-  //   counter_ +=1;    
-  // }
-  // else if (fabs(past_target_rot_ - target_rot_) > 1e-5 && counter_ > 25 ){
-  //     counter_ = 0;
-  // }
-  // else{
-  // joints_[STEER_LEFT]->SetForce(0, steer_cmd_effort[STEER_LEFT]);
-  // joints_[STEER_RIGHT]->SetForce(0, steer_cmd_effort[STEER_RIGHT]);
-    counter_ +=1;
-  // } 
-
-  (void)steer_cmd_effort;
-
-  double linear_cmd_left = linear_cmd_[REAR_LEFT];
-  double linear_cmd_right = linear_cmd_[REAR_RIGHT];
-
-  // Current speed assuming equal for left rear and right rear
-  // auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
-  // auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
-  // double linear_diff = linear_vel - target_linear / wheel_radius_;
-  // double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
-
-  // joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-  // joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
-  linear_cmd = linear_cmd_right;
-  joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
-  linear_cmd = linear_cmd_left;
-  joints_[REAR_LEFT]->SetForce(0, linear_cmd);
-
+/* ********* Set the steering wheel position ************* */
   if (joints_.size() == 7) {
     joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
   }
