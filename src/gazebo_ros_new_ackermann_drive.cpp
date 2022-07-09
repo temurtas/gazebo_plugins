@@ -580,8 +580,8 @@ double target_linear_vel_left  = 0.0;
 // method # 2: Modified Ackermann Plug-in w/seperated joint comments for right and left wheels
 // method # 3: Constant Steering Angle with  
 
-int method = 5;
-
+int method = 2;
+  
 switch (method) {
   case 1: {
 /* ******************************************************* */
@@ -589,6 +589,7 @@ switch (method) {
 /* ******************************************************* */
     /* Current speed assuming equal for left rear and right rear */
     linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
+
     target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
     linear_diff = linear_vel - target_linear / wheel_radius_;
     linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
@@ -767,14 +768,22 @@ switch (method) {
     linear_cmd_left  = linear_cmd_[REAR_LEFT];
     linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
-    joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
-    joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+    (void)linear_cmd_left;
+    (void)linear_cmd_right;
+    
+    // joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
+    // joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+    joints_[REAR_RIGHT]->SetVelocity(0,  target_linear_vel_[REAR_RIGHT]/ wheel_radius_);
+    joints_[REAR_LEFT]->SetVelocity(0, target_linear_vel_[REAR_LEFT]/ wheel_radius_);
     /* Set front steering angles to ideal target steering angle */
     joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
     joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
     /* Set front wheel velocities as rear ones, setting exact position locks the wheel! */
-    fl_lin_vel = linear_vel_[REAR_LEFT];
-    fr_lin_vel = linear_vel_[REAR_RIGHT]; 
+    // fl_lin_vel = linear_vel_[REAR_LEFT];
+    // fr_lin_vel = linear_vel_[REAR_RIGHT]; 
+
+    fl_lin_vel = target_linear_vel_[REAR_LEFT];
+    fr_lin_vel = target_linear_vel_[REAR_RIGHT]; 
      
     joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
     joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
