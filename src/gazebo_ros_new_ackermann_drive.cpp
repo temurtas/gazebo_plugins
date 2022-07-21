@@ -580,7 +580,7 @@ double target_linear_vel_left  = 0.0;
 // method # 2: Modified Ackermann Plug-in w/seperated joint comments for right and left wheels
 // method # 3: Constant Steering Angle with  
 
-int method = 2;
+int method = 3;
   
 switch (method) {
   case 1: {
@@ -651,6 +651,10 @@ switch (method) {
     tanSteer = tan(target_rot);
     target_left_steering  = atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
     target_right_steering = atan2(tanSteer, 1.0 - wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
+
+    // target_left_steering = atan2(wheel_base_ * tanSteer, wheel_base_ + wheel_separation_ / 2.0 * tanSteer );
+    // target_right_steering = atan2(wheel_base_ * tanSteer, wheel_base_ - wheel_separation_ / 2.0 * tanSteer );
+
     /* Calculate the error variable */
     left_steering_angle = joints_[STEER_LEFT]->Position(0);
     right_steering_angle = joints_[STEER_RIGHT]->Position(0);
@@ -676,7 +680,7 @@ switch (method) {
   }
   case 3: {
 /* **************************************************************** */
-/* ***************** METHOD #2 : Modified Plugin  ***************** */
+/* ***************** METHOD #3 : Modified Plugin  ***************** */
 /* ****** w/seperated joint comments for right and left wheels **** */
 /* **************************************************************** */
     /* Compute Linear Velocity Command For Rear Wheels without assuming equal speeds */
@@ -712,7 +716,7 @@ switch (method) {
     steer_error[STEER_LEFT] = steer_ang_curr[STEER_LEFT] - target_rot_6[STEER_LEFT];
     /* Calculate the command */
     steer_cmd_effort[STEER_LEFT] = pid_left_steering_.Update(steer_error[STEER_LEFT], seconds_since_last_update);
-    steer_cmd_effort[STEER_RIGHT] = pid_left_steering_.Update(steer_error[STEER_RIGHT], seconds_since_last_update);
+    steer_cmd_effort[STEER_RIGHT] = pid_right_steering_.Update(steer_error[STEER_RIGHT], seconds_since_last_update);
     /* Calculate the Steering Wheel Angle */
     steer_wheel_angle = (steer_ang_curr[STEER_LEFT] + steer_ang_curr[STEER_RIGHT]) * 0.5 / steering_ratio_;
 
@@ -891,26 +895,44 @@ switch (method) {
   #endif
 }
 
-std::vector<double> GazeboRosNewAckermannDrivePrivate::GetAckAngles(double phi) {
-    std::vector<double> phi_angles;
-    double numerator = 2.0 * wheel_base_ * sin(phi);
-    phi_angles.assign(6, 0.0);
-    phi_angles[STEER_LEFT] = atan2(numerator,
-       (2.0*wheel_base_*cos(phi) - wheel_separation_*sin(phi)) );
-    phi_angles[STEER_RIGHT] = atan2(numerator,
-       (2.0*wheel_base_*cos(phi) + wheel_separation_*sin(phi)) );
-    return phi_angles;
-  }
+// std::vector<double> GazeboRosNewAckermannDrivePrivate::GetAckAngles(double phi) {
+//     std::vector<double> phi_angles;
+//     double numerator = 2.0 * wheel_base_ * sin(phi);
+//     phi_angles.assign(6, 0.0);
+//     phi_angles[STEER_LEFT] = atan2(numerator,
+//        (2.0*wheel_base_*cos(phi) - wheel_separation_*sin(phi)) );
+//     phi_angles[STEER_RIGHT] = atan2(numerator,
+//        (2.0*wheel_base_*cos(phi) + wheel_separation_*sin(phi)) );
+//     return phi_angles;
+//   }
 
-  std::vector<double> GazeboRosNewAckermannDrivePrivate::GetDiffSpeeds(double vel, double phi) {
-    std::vector<double> wheel_speeds;
-    wheel_speeds.assign(6, 0.0);
-    wheel_speeds[REAR_LEFT] = vel * (1.0 - (wheel_separation_ * tan(phi) ) /
-       (2.0 * wheel_base_) );
-    wheel_speeds[REAR_RIGHT] = vel * (1.0 + (wheel_separation_ * tan(phi) ) /
-       (2.0 * wheel_base_) );
-    return wheel_speeds;
-  }
+// std::vector<double> GazeboRosNewAckermannDrivePrivate::GetDiffSpeeds(double vel, double phi) {
+//   std::vector<double> wheel_speeds;
+//   wheel_speeds.assign(6, 0.0);
+//   wheel_speeds[REAR_LEFT] = vel * (1.0 - (wheel_separation_ * tan(phi) ) /
+//     (2.0 * wheel_base_) );
+//   wheel_speeds[REAR_RIGHT] = vel * (1.0 + (wheel_separation_ * tan(phi) ) /
+//     (2.0 * wheel_base_) );
+//   return wheel_speeds;
+// }
+
+std::vector<double> GazeboRosNewAckermannDrivePrivate::GetAckAngles(double phi) {
+  std::vector<double> phi_angles;
+  double width = 0.5 * wheel_separation_;
+  phi_angles.assign(6, 0.0);
+  phi_angles[STEER_LEFT]  = atan2(wheel_base_ * tan(phi), wheel_base_ + width * tan(phi) );
+  phi_angles[STEER_RIGHT] = atan2(wheel_base_ * tan(phi), wheel_base_ - width * tan(phi) );
+  return phi_angles;
+}
+
+std::vector<double> GazeboRosNewAckermannDrivePrivate::GetDiffSpeeds(double vel, double phi) {
+  std::vector<double> wheel_speeds;
+  double width = 0.5 * wheel_separation_;
+  wheel_speeds.assign(6, 0.0);
+  wheel_speeds[REAR_LEFT]  = vel * ( (wheel_base_ + width * tan(phi) ) / wheel_base_ );
+  wheel_speeds[REAR_RIGHT] = vel * ( (wheel_base_ - width * tan(phi) ) / wheel_base_ );
+  return wheel_speeds;
+}
 
 void GazeboRosNewAckermannDrivePrivate::OnCmdVel(const geometry_msgs::msg::Twist::SharedPtr _msg)
 {

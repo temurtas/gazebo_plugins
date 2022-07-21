@@ -651,24 +651,43 @@ void HTNavGazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateI
   #endif
 }
 
+// std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetAckAngles(double phi) {
+//     std::vector<double> phi_angles;
+//     double numerator = 2.0 * wheel_base_ * sin(phi);
+//     phi_angles.assign(6, 0.0);
+//     phi_angles[STEER_LEFT] = atan2(numerator,
+//        (2.0*wheel_base_*cos(phi) - wheel_separation_*sin(phi)) );
+//     phi_angles[STEER_RIGHT] = atan2(numerator,
+//        (2.0*wheel_base_*cos(phi) + wheel_separation_*sin(phi)) );
+//     return phi_angles;
+//   }
+
+//   std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetDiffSpeeds(double vel, double phi) {
+//     std::vector<double> wheel_speeds;
+//     wheel_speeds.assign(6, 0.0);
+//     wheel_speeds[REAR_LEFT] = vel * (1.0 - (wheel_separation_ * tan(phi) ) /
+//        (2.0 * wheel_base_) );
+//     wheel_speeds[REAR_RIGHT] = vel * (1.0 + (wheel_separation_ * tan(phi) ) /
+//        (2.0 * wheel_base_) );
+//     return wheel_speeds;
+//   }
+
+
 std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetAckAngles(double phi) {
     std::vector<double> phi_angles;
-    double numerator = 2.0 * wheel_base_ * sin(phi);
+    double width = 0.5 * wheel_separation_;
     phi_angles.assign(6, 0.0);
-    phi_angles[STEER_LEFT] = atan2(numerator,
-       (2.0*wheel_base_*cos(phi) - wheel_separation_*sin(phi)) );
-    phi_angles[STEER_RIGHT] = atan2(numerator,
-       (2.0*wheel_base_*cos(phi) + wheel_separation_*sin(phi)) );
+    phi_angles[STEER_LEFT]  = atan2(wheel_base_ * tan(phi) - width , wheel_base_ );
+    phi_angles[STEER_RIGHT] = atan2(wheel_base_ * tan(phi) + width , wheel_base_ );
     return phi_angles;
   }
 
   std::vector<double> HTNavGazeboRosAckermannDrivePrivate::GetDiffSpeeds(double vel, double phi) {
     std::vector<double> wheel_speeds;
+    double width = 0.5 * wheel_separation_;
     wheel_speeds.assign(6, 0.0);
-    wheel_speeds[REAR_LEFT] = vel * (1.0 - (wheel_separation_ * tan(phi) ) /
-       (2.0 * wheel_base_) );
-    wheel_speeds[REAR_RIGHT] = vel * (1.0 + (wheel_separation_ * tan(phi) ) /
-       (2.0 * wheel_base_) );
+    wheel_speeds[REAR_LEFT]  = vel * ( (wheel_base_ - width * tan(phi) ) / wheel_base_ );
+    wheel_speeds[REAR_RIGHT] = vel * ( (wheel_base_ + width * tan(phi) ) / wheel_base_ );
     return wheel_speeds;
   }
 
