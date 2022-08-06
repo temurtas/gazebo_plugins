@@ -205,7 +205,8 @@ public:
   gazebo::common::PID pid_right_steering_;
 
   /// PID control for linear velocity control
-  gazebo::common::PID pid_linear_vel_;
+  gazebo::common::PID pid_linear_vel_left_;
+  gazebo::common::PID pid_linear_vel_right_;
 
 
   FILE *fptr;
@@ -340,7 +341,9 @@ void GazeboRosNewAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::Ele
     "linear_velocity_pid_gain", ignition::math::Vector3d::Zero).first;
   i_range = _sdf->Get<ignition::math::Vector2d>(
     "linear_velocity_i_range", ignition::math::Vector2d::Zero).first;
-  impl_->pid_linear_vel_.Init(pid.X(), pid.Y(), pid.Z(), i_range.Y(), i_range.X());
+
+  impl_->pid_linear_vel_left_.Init(pid.X(), pid.Y(), pid.Z(), i_range.Y(), i_range.X());
+  impl_->pid_linear_vel_right_.Init(pid.X(), pid.Y(), pid.Z(), i_range.Y(), i_range.X());
 
   // Update wheel radiu for wheel from SDF collision objects
   // assumes that wheel link is child of joint (and not parent of joint)
@@ -592,7 +595,7 @@ switch (method) {
 
     target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
     linear_diff = linear_vel - target_linear / wheel_radius_;
-    linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
+    linear_cmd = pid_linear_vel_left_.Update(linear_diff, seconds_since_last_update);
 
     /* Calculate the target steering angle using ackermann geometry */
     target_rot = target_rot_ * copysign(1.0, target_linear_);
@@ -640,11 +643,14 @@ switch (method) {
     target_linear_vel_[REAR_LEFT] = ignition::math::clamp(ack_drive_velocities[REAR_LEFT], -max_speed_, max_speed_);
     target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(ack_drive_velocities[REAR_RIGHT], -max_speed_, max_speed_);
 
+    // target_linear_vel_[REAR_LEFT] = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
+    // target_linear_vel_[REAR_RIGHT] = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
+
     linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
     linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
 
-    linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
-    linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
+    linear_cmd_[REAR_LEFT] = pid_linear_vel_left_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+    linear_cmd_[REAR_RIGHT] = pid_linear_vel_right_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
 
     /* Calculate the target steering angle using ackermann geometry */
     target_rot = target_rot_ ; 
@@ -701,8 +707,8 @@ switch (method) {
     linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
     linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
 
-    linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
-    linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
+    linear_cmd_[REAR_LEFT] = pid_linear_vel_left_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+    linear_cmd_[REAR_RIGHT] = pid_linear_vel_right_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
 
     /* Calculate the target steering angle using ackermann geometry */
     ack_steer_angles = GetAckAngles(target_rot_); 
@@ -757,8 +763,8 @@ switch (method) {
     linear_diff_[REAR_LEFT] = linear_vel_[REAR_LEFT] - target_linear_vel_[REAR_LEFT] / wheel_radius_;
     linear_diff_[REAR_RIGHT] = linear_vel_[REAR_RIGHT] - target_linear_vel_[REAR_RIGHT] / wheel_radius_;
 
-    linear_cmd_[REAR_LEFT] = pid_linear_vel_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
-    linear_cmd_[REAR_RIGHT] = pid_linear_vel_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
+    linear_cmd_[REAR_LEFT] = pid_linear_vel_left_.Update(linear_diff_[REAR_LEFT], seconds_since_last_update);
+    linear_cmd_[REAR_RIGHT] = pid_linear_vel_right_.Update(linear_diff_[REAR_RIGHT], seconds_since_last_update);
 
     /* Calculate the target steering angle using ackermann geometry */
     target_rot = target_rot_ ; // * copysign(1.0, target_linear_);
@@ -849,7 +855,7 @@ switch (method) {
     linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
     target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
     linear_diff = linear_vel - target_linear / wheel_radius_;
-    linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
+    linear_cmd = pid_linear_vel_left_.Update(linear_diff, seconds_since_last_update);
 
     /* Calculate the target steering angle using ackermann geometry */
     target_rot = target_rot_ * copysign(1.0, target_linear_);
