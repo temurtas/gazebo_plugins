@@ -267,11 +267,15 @@ void HTNavGazeboRosLinkIMUPublisher::Load(gazebo::physics::ModelPtr model, sdf::
   impl_->last_update_time_ = model->GetWorld()->SimTime();
 
   // IMU Link IMU publisher
-  impl_->imu_meas_pub_ = impl_->ros_nRCLCPP_INFO(this->dataPtr->ros_node_->get_logger(),
-      "New lateral slip compliance: %.3e", params.slipComplianceLateral);pl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
+  impl_->imu_meas_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::JointState>(
+    "imu_data_link_body", qos.get_publisher_qos("imu_data_link_body", rclcpp::QoS(1000)));
+
+  impl_->pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
+    "imu_data_body", qos.get_publisher_qos("imu_data_body", rclcpp::SensorDataQoS().best_effort()));
+
+  impl_->ideal_pub_ = impl_->ros_node_->create_publisher<sensor_msgs::msg::Imu>(
     "imu_data_body_ideal", qos.get_publisher_qos("imu_data_body_ideal", rclcpp::SensorDataQoS().best_effort()));
 
- 
   // Callback on every iteration
   impl_->update_connection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
     std::bind(&HTNavGazeboRosLinkIMUPublisherPrivate::OnUpdate, impl_.get(), std::placeholders::_1));
