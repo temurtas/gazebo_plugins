@@ -62,6 +62,7 @@ public:
   /// Connects to pre-render events.
   gazebo::event::ConnectionPtr update_connection_;
 
+  int counter_ = 0;
   FILE *fptr;
 
   int init_flag_ = 0;
@@ -97,7 +98,7 @@ void HTNavGazeboRosContactSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::
 
   // Contact state publisher
   impl_->pub_ = impl_->ros_node_->create_publisher<gazebo_msgs::msg::ContactsState>(
-    "contact_states", qos.get_publisher_qos("contact_states", rclcpp::SensorDataQoS().reliable()));
+    "ht_bumper_states", qos.get_publisher_qos("ht_bumper_states", rclcpp::SensorDataQoS().reliable()));
 
   RCLCPP_INFO(
     impl_->ros_node_->get_logger(), "Publishing contact states to [%s]",
@@ -117,6 +118,7 @@ void HTNavGazeboRosContactSensor::Load(gazebo::sensors::SensorPtr _sensor, sdf::
 
 void HTNavGazeboRosContactSensorPrivate::OnUpdate()
 {
+  counter_ = counter_ +1;
 
   if (init_flag_ == 0)
   {
@@ -146,16 +148,24 @@ void HTNavGazeboRosContactSensorPrivate::OnUpdate()
   IGN_PROFILE_BEGIN("publish");
 #endif
 
-// RCLCPP_INFO(ros_node_->get_logger(), "Contact Size [%d]", contacts.contact_size());
+  // if (counter_ % 100 == 0)
+  // {
+  //   RCLCPP_INFO(ros_node_->get_logger(), "Contacts Size [%d]", contacts.contact_size());
+  // }
+  
 
 for (int i = 0; i < contacts.contact_size(); ++i)
   {
     // std::cout << "Collision between[" << contacts.contact(i).collision1()
     //           << "] and [" << contacts.contact(i).collision2() << "]\n";
-  // RCLCPP_INFO(ros_node_->get_logger(), "Position Size [%d]", contacts.contact(i).position_size());
-
+    // if (counter_ % 100 == 0)
+    // {
+    //   RCLCPP_INFO(ros_node_->get_logger(), "Pos Size [%d]", contacts.contact(i).position_size());
+    // }
     for (int j = 0; j < contacts.contact(i).position_size(); ++j)
     {
+    // RCLCPP_INFO(
+    // ros_node_->get_logger(), "Subscribed to [%s]", contacts.contact(i).position(j).x());
     // RCLCPP_INFO(ros_node_->get_logger(), "Pos X [%lf]", contacts.contact(i).position(j).x());
     // RCLCPP_INFO(ros_node_->get_logger(), "Pos Y [%lf]", contacts.contact(i).position(j).y());
     // RCLCPP_INFO(ros_node_->get_logger(), "Pos Z [%lf]", contacts.contact(i).position(j).z());
