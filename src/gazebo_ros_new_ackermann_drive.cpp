@@ -165,6 +165,9 @@ public:
   /// Angular velocity in Z received on command (rad/s).
   double target_rot_{0.0};
 
+  int lin_vel_stop_{0};
+  int steer_stop_{0};
+
   /// Update period in seconds.
   double update_period_;
 
@@ -615,12 +618,23 @@ switch (method) {
     /* Calculate the Steering Wheel Angle */
     steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
 
-    /* Set calculated command torques to rear wheel joints*/
-    joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
-    joints_[REAR_LEFT]->SetForce(0, linear_cmd);
-    /* Set calculated command torques to front wheel joints*/
-    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
+    if(lin_vel_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to rear wheel joints*/
+      joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
+      joints_[REAR_LEFT]->SetForce(0, linear_cmd);
+    }
+
+    if(steer_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to front wheel joints*/
+      joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+      joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
+    }
     break;
   }
   case 2: {
@@ -677,11 +691,23 @@ switch (method) {
     linear_cmd_left  = linear_cmd_[REAR_LEFT];
     linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
-    joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
-    joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
-    /* Set calculated command torques to front wheel joints*/    
-    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    if(lin_vel_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to rear wheel joints*/
+      joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
+      joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+    }
+
+    if(steer_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to front wheel joints*/
+      joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+      joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    }
     break;
   }
   case 3: {
@@ -726,18 +752,29 @@ switch (method) {
     /* Calculate the Steering Wheel Angle */
     steer_wheel_angle = (steer_ang_curr[STEER_LEFT] + steer_ang_curr[STEER_RIGHT]) * 0.5 / steering_ratio_;
 
-    /* Set calculated command torques to rear wheel joints*/
-    linear_cmd_left  = linear_cmd_[REAR_LEFT];
-    linear_cmd_right = linear_cmd_[REAR_RIGHT];
+    if(lin_vel_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to rear wheel joints*/
+      linear_cmd_left  = linear_cmd_[REAR_LEFT];
+      linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
-    joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
-    joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
-    /* Set calculated command torques to front wheel joints*/
-    left_steering_cmd  = steer_cmd_effort[STEER_LEFT];
-    right_steering_cmd = steer_cmd_effort[STEER_RIGHT];
+      joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
+      joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+    }
 
-    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    if(steer_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to front wheel joints*/
+      left_steering_cmd  = steer_cmd_effort[STEER_LEFT];
+      right_steering_cmd = steer_cmd_effort[STEER_RIGHT];
+
+      joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+      joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    }
     break;
   }
   case 4: {
@@ -781,22 +818,34 @@ switch (method) {
     (void)linear_cmd_left;
     (void)linear_cmd_right;
     
-    // joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
-    // joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
-    joints_[REAR_RIGHT]->SetVelocity(0,  target_linear_vel_[REAR_RIGHT]/ wheel_radius_);
-    joints_[REAR_LEFT]->SetVelocity(0, target_linear_vel_[REAR_LEFT]/ wheel_radius_);
-    /* Set front steering angles to ideal target steering angle */
-    joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
-    joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
-    /* Set front wheel velocities as rear ones, setting exact position locks the wheel! */
-    // fl_lin_vel = linear_vel_[REAR_LEFT];
-    // fr_lin_vel = linear_vel_[REAR_RIGHT]; 
+    if(lin_vel_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to rear wheel joints*/
+      // joints_[REAR_RIGHT]->SetForce(0, linear_cmd_right);
+      // joints_[REAR_LEFT]->SetForce(0, linear_cmd_left);
+      joints_[REAR_RIGHT]->SetVelocity(0,  target_linear_vel_[REAR_RIGHT]/ wheel_radius_);
+      joints_[REAR_LEFT]->SetVelocity(0, target_linear_vel_[REAR_LEFT]/ wheel_radius_);
+    }
 
-    fl_lin_vel = target_linear_vel_[REAR_LEFT];
-    fr_lin_vel = target_linear_vel_[REAR_RIGHT]; 
-     
-    joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
-    joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
+    if(steer_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to front wheel joints*/
+      joints_[STEER_LEFT]->SetPosition(0, target_left_steering);
+      joints_[STEER_RIGHT]->SetPosition(0, target_right_steering );  
+      /* Set front wheel velocities as rear ones, setting exact position locks the wheel! */
+      // fl_lin_vel = linear_vel_[REAR_LEFT];
+      // fr_lin_vel = linear_vel_[REAR_RIGHT]; 
+
+      fl_lin_vel = target_linear_vel_[REAR_LEFT];
+      fr_lin_vel = target_linear_vel_[REAR_RIGHT]; 
+      
+      joints_[STEER_LEFT]->SetVelocity(1,  fl_lin_vel);
+      joints_[STEER_RIGHT]->SetVelocity(1, fr_lin_vel);
+    }
     break;
   }
   case 5: {
@@ -840,11 +889,23 @@ switch (method) {
     target_linear_vel_right = target_linear_vel_[REAR_RIGHT];
     target_linear_vel_left  = target_linear_vel_[REAR_LEFT];
 
-    joints_[REAR_RIGHT]->SetVelocity(1,  target_linear_vel_right);
-    joints_[REAR_LEFT]->SetVelocity(1, target_linear_vel_left);
-    /* Set calculated command torques to front wheel joints*/
-    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    if(lin_vel_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to rear wheel joints*/
+      joints_[REAR_RIGHT]->SetVelocity(1,  target_linear_vel_right);
+      joints_[REAR_LEFT]->SetVelocity(1, target_linear_vel_left);
+    }
+
+    if(steer_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to front wheel joints*/
+      joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+      joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);  
+    }
     break;
   }
   default: {
@@ -874,13 +935,23 @@ switch (method) {
     right_steering_cmd = pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
     /* Calculate the Steering Wheel Angle */
     steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
+    if(lin_vel_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to rear wheel joints*/
+      joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
+      joints_[REAR_LEFT]->SetForce(0, linear_cmd);
+    }
 
-    /* Set calculated command torques to rear wheel joints*/
-    joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
-    joints_[REAR_LEFT]->SetForce(0, linear_cmd);
-    /* Set calculated command torques to front wheel joints*/
-    joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
-    joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
+    if(steer_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      /* Set calculated command torques to front wheel joints*/
+      joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
+      joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
+    }
     break;
   }
 }
@@ -890,7 +961,12 @@ switch (method) {
   
 /* ********* Set the steering wheel position ************* */
   if (joints_.size() == 7) {
-    joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
+    if(steer_stop_ == 1){
+      // Stop sending velocity commands
+    }
+    else{
+      joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
+    }
   }
 
   counter_ +=1;
@@ -945,6 +1021,13 @@ void GazeboRosNewAckermannDrivePrivate::OnCmdVel(const geometry_msgs::msg::Twist
   std::lock_guard<std::mutex> scoped_lock(lock_);
   target_linear_ = _msg->linear.x;
   target_rot_ = _msg->angular.z;
+
+  lin_vel_stop_ = int(_msg->linear.z);
+  steer_stop_   = int(_msg->angular.x);
+
+  // lin_vel_zero_ = int(_msg->linear.y);
+  // steer_zero_   = int(_msg->angular.y);
+
 }
 
 double GazeboRosNewAckermannDrivePrivate::CollisionRadius(const gazebo::physics::CollisionPtr & _coll)
