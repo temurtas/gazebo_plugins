@@ -57,11 +57,11 @@ public:
   /// Indicates which link
   enum
   {
-    FRONT_RIGHT, // Front right wheel
     FRONT_LEFT,  // Front left wheel
-    REAR_RIGHT,  // Rear right wheel
+    FRONT_RIGHT, // Front right wheel
     REAR_LEFT,   // Rear left wheel
-    IMU_LINK     // Steering wheel
+    REAR_RIGHT,  // Rear right wheel
+    IMU_LINK,    // IMU LINK
   };
 
   /// Callback to be called at every simulation iteration.

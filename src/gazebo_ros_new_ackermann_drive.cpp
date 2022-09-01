@@ -619,7 +619,7 @@ switch (method) {
     steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
 
     if(lin_vel_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Linear Velocity Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to rear wheel joints*/
@@ -628,7 +628,7 @@ switch (method) {
     }
 
     if(steer_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Steering Angle Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to front wheel joints*/
@@ -692,7 +692,7 @@ switch (method) {
     linear_cmd_right = linear_cmd_[REAR_RIGHT];
 
     if(lin_vel_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Linear Velocity Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to rear wheel joints*/
@@ -701,7 +701,7 @@ switch (method) {
     }
 
     if(steer_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Steering Angle Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to front wheel joints*/
@@ -753,7 +753,7 @@ switch (method) {
     steer_wheel_angle = (steer_ang_curr[STEER_LEFT] + steer_ang_curr[STEER_RIGHT]) * 0.5 / steering_ratio_;
 
     if(lin_vel_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Linear Velocity Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to rear wheel joints*/
@@ -765,7 +765,7 @@ switch (method) {
     }
 
     if(steer_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Steering Angle Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to front wheel joints*/
@@ -819,7 +819,7 @@ switch (method) {
     (void)linear_cmd_right;
     
     if(lin_vel_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Linear Velocity Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to rear wheel joints*/
@@ -830,7 +830,7 @@ switch (method) {
     }
 
     if(steer_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Steering Angle Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to front wheel joints*/
@@ -890,7 +890,7 @@ switch (method) {
     target_linear_vel_left  = target_linear_vel_[REAR_LEFT];
 
     if(lin_vel_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Linear Velocity Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to rear wheel joints*/
@@ -899,7 +899,7 @@ switch (method) {
     }
 
     if(steer_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Steering Angle Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to front wheel joints*/
@@ -936,7 +936,7 @@ switch (method) {
     /* Calculate the Steering Wheel Angle */
     steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
     if(lin_vel_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Linear Velocity Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to rear wheel joints*/
@@ -945,7 +945,7 @@ switch (method) {
     }
 
     if(steer_stop_ == 1){
-      // Stop sending velocity commands
+      RCLCPP_INFO(ros_node_->get_logger(), "Stopped Steering Angle Control at time: [%lf]", _info.simTime.Double());
     }
     else{
       /* Set calculated command torques to front wheel joints*/
@@ -957,7 +957,7 @@ switch (method) {
 }
 
 /* ****************** Increase the Counter  ************* */
-  counter_ +=1;
+  // counter_ +=1;
   
 /* ********* Set the steering wheel position ************* */
   if (joints_.size() == 7) {

@@ -53,6 +53,16 @@ namespace gazebo_plugins
 class HTNavGazeboRosJointStatePublisherPrivate
 {
 public:
+
+  enum
+  {
+    FRONT_LEFT,  // Front left wheel
+    FRONT_RIGHT, // Front right wheel
+    REAR_LEFT,   // Rear left wheel
+    REAR_RIGHT,  // Rear right wheel
+    IMU_LINK,    // IMU LINK
+  };
+
   /// Callback to be called at every simulation iteration.
   /// \param[in] info Updated simulation info.
   void OnUpdate(const gazebo::common::UpdateInfo & info);
@@ -74,6 +84,15 @@ public:
 
   /// Pointer to the update event connection.
   gazebo::event::ConnectionPtr update_connection_;
+
+  int ang_vel_counter_ = 0;
+  
+  double ang_vel_[5] = {0,0,0,0,0};
+  double ang_vel_avg[5] = {0,0,0,0,0};
+  double ang_vel_min_[5] = {0,0,0,0,0};
+  double ang_vel_min_two_[5] = {0,0,0,0,0};
+  
+  
 };
 
 HTNavGazeboRosJointStatePublisher::HTNavGazeboRosJointStatePublisher()
@@ -176,24 +195,70 @@ void HTNavGazeboRosJointStatePublisherPrivate::OnUpdate(const gazebo::common::Up
   sensor_msgs::msg::JointState joint_state;
 
   joint_state.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(current_time);
-  joint_state.name.resize(joints_.size());
-  joint_state.position.resize(joints_.size());
-  joint_state.velocity.resize(joints_.size());
+  // joint_state.name.resize(joints_.size());
+  // joint_state.position.resize(joints_.size());
+  // joint_state.velocity.resize(joints_.size());
+  joint_state.name.resize(5);
+  joint_state.position.resize(5);
+  joint_state.velocity.resize(5);
+
+  int JOINT_IND = 0;
 
   for (unsigned int i = 0; i < joints_.size(); ++i) {
     auto joint = joints_[i];
     double velocity = 0.0;
+
+    auto joint_name = joint->GetName();
+
+    if(joint_name == "front_left_combined_joint"){
+      JOINT_IND = FRONT_LEFT;
+    }
+    else if(joint_name == "front_right_combined_joint"){
+      JOINT_IND = FRONT_RIGHT;
+    }
+    else if(joint_name == "rear_left_wheel_joint") {
+      JOINT_IND = REAR_LEFT;
+    }
+    else if(joint_name == "rear_right_wheel_joint"){
+      JOINT_IND = REAR_RIGHT;
+    }
+    else{
+      JOINT_IND = 4;
+    }
+
+    // RCLCPP_INFO(ros_node_->get_logger(), "Index of joint to pub : %d", JOINT_IND);
+
     if (i < 4){
       velocity = joint->GetVelocity(1);
     }
     else{
       velocity = joint->GetVelocity(0);
     }  
+
+    ang_vel_[JOINT_IND] = velocity;
+
+    if( ang_vel_counter_ == 0){
+      ang_vel_min_[JOINT_IND]       = velocity;
+      ang_vel_min_two_[JOINT_IND]   = velocity;
+    }
+
+    double temp_ang_vel_avg = (ang_vel_[JOINT_IND] + ang_vel_min_[JOINT_IND] + ang_vel_min_two_[JOINT_IND])/3; 
+    ang_vel_avg[JOINT_IND] = temp_ang_vel_avg;
+    // if(counter_ % 3 == 0){
+    //   ang_vel_avg[JOINT_IND] = temp_ang_vel_avg;
+    // }
+
+    ang_vel_min_two_[JOINT_IND] = ang_vel_min_[JOINT_IND];
+    ang_vel_min_[JOINT_IND]     = ang_vel_[JOINT_IND];
+
     double position = joint->Position(0);  
-    joint_state.name[i] = joint->GetName();
-    joint_state.position[i] = - position; // positive rotation is clockwise (ENU -> NED transformation) // <HT>
-    joint_state.velocity[i] = velocity;   
+    joint_state.name[JOINT_IND] = joint->GetName();
+    joint_state.position[JOINT_IND] = - position; // positive rotation is clockwise (ENU -> NED transformation) // <HT>
+    joint_state.velocity[JOINT_IND] = ang_vel_avg[JOINT_IND];   
+
+    ang_vel_counter_ = ang_vel_counter_+1;
   }
+
 #ifdef IGN_PROFILER_ENABLE
   IGN_PROFILE_END();
   IGN_PROFILE_BEGIN("publish");
